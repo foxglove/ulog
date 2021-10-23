@@ -1,0 +1,54 @@
+{
+  "name": "@foxglove/ulog",
+  "version": "0.0.0",
+  "description": "PX4 ULog file reader",
+  "license": "MIT",
+  "keywords": [
+    "ulog",
+    "px4",
+    "drones",
+    "robotics",
+    "deserialization",
+    "serde"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/foxglove/ulog.git"
+  },
+  "author": {
+    "name": "Foxglove Technologies Inc",
+    "email": "contact@foxglove.dev"
+  },
+  "homepage": "https://github.com/foxglove/ulog",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "lint:ci": "eslint --report-unused-disable-directives .",
+    "lint": "eslint --report-unused-disable-directives --fix .",
+    "prepack": "yarn build",
+    "prepublishOnly": "yarn lint:ci && yarn test",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@foxglove/eslint-plugin": "0.17.1",
+    "@types/jest": "^27.0.1",
+    "@typescript-eslint/eslint-plugin": "5.1.0",
+    "@typescript-eslint/parser": "5.1.0",
+    "eslint": "7.32.0",
+    "eslint-config-prettier": "8.3.0",
+    "eslint-plugin-es": "4.1.0",
+    "eslint-plugin-filenames": "1.3.2",
+    "eslint-plugin-import": "2.25.2",
+    "eslint-plugin-jest": "25.2.2",
+    "eslint-plugin-prettier": "4.0.0",
+    "jest": "27.3.1",
+    "prettier": "2.4.1",
+    "ts-jest": "27.0.7",
+    "typescript": "4.4.4"
+  }
+}
