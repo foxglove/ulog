@@ -1,4 +1,4 @@
-import { Filelike } from "./types";
+import { Filelike } from "./file";
 
 const CHUNK_SIZE = 16384;
 
@@ -17,7 +17,7 @@ export class ChunkedReader {
     this.chunkSize = chunkSize;
   }
 
-  offset(): number {
+  position(): number {
     return this._fileCursor - (this._chunk?.byteLength ?? 0) + this._chunkCursor;
   }
 
@@ -26,7 +26,7 @@ export class ChunkedReader {
   }
 
   seek(relativeByteOffset: number): void {
-    this._fileCursor = this.offset() + relativeByteOffset;
+    this._fileCursor = this.position() + relativeByteOffset;
     this._chunkCursor = 0;
     this._chunk = undefined;
     this._view = undefined;
@@ -37,6 +37,11 @@ export class ChunkedReader {
     this._chunkCursor = 0;
     this._chunk = undefined;
     this._view = undefined;
+  }
+
+  async peek(count: number): Promise<DataView> {
+    const view = await this.view(count);
+    return new DataView(view.buffer, view.byteOffset + this._chunkCursor, count);
   }
 
   async readBytes(count: number): Promise<Uint8Array> {

@@ -1,6 +1,6 @@
 import * as fs from "fs/promises";
 
-import { Filelike } from "../types";
+import { Filelike } from "../file";
 
 /**
  * A FileReader implemented using the node.js filesystem API.

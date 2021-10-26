@@ -1,4 +1,4 @@
-import { Filelike } from "../types";
+import { Filelike } from "../file";
 
 // browser reader for Blob|File objects
 export class BlobReader implements Filelike {
