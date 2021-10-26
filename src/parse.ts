@@ -45,8 +45,13 @@ export function parseFieldValue(
       throw new Error(`Unknown type ${field.type}, searched ${definitions.size} definitions`);
     }
     if (field.arrayLength != undefined) {
-      throw new Error(`Complex arrays not supported yet`);
+      const size = fieldSize(field, definitions);
+      const output: FieldStruct[] = [];
+      for (let i = 0; i < field.arrayLength; i++) {
+        output.push(parseMessage(definition, definitions, view, offset + i * size));
+      }
     }
+
     return parseMessage(definition, definitions, view, offset);
   }
 
@@ -57,6 +62,7 @@ export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): 
   const basicType = field.type as BuiltinType;
 
   if (field.arrayLength != undefined) {
+    // String handling
     if (field.type === "char") {
       const len = Math.min(field.arrayLength, view.byteLength - offset);
       const byteOffset = view.byteOffset + offset;
@@ -66,9 +72,7 @@ export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): 
     const basicSize = basicFieldSize(basicType, undefined);
     const output: FieldPrimitive[] = [];
     for (let i = 0; i < field.arrayLength; i++) {
-      const curOffset = offset + i * basicSize;
-      const curValue = parseBasic(basicType, view, curOffset);
-      output.push(curValue);
+      output.push(parseBasic(basicType, view, offset + i * basicSize));
     }
     return output;
   }
