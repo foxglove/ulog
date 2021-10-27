@@ -4,6 +4,7 @@ env:
 
 ignorePatterns:
   - dist
+  - "*.js"
 
 extends:
   - plugin:@foxglove/base

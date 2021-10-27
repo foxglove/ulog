@@ -24,7 +24,11 @@
   "typings": "dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "node.d.ts",
+    "node.js",
+    "web.d.ts",
+    "web.js"
   ],
   "scripts": {
     "build": "tsc -b",

@@ -362,3 +362,52 @@ describe("ULog sample_appended.ulg", () => {
     void reader.close();
   });
 });
+
+describe("README.md", () => {
+  const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
+
+  it("example code works", async () => {
+    const ulog = new ULog(new FileReader(sampleFixture));
+    await ulog.open(); // required before any other operations
+    await ulog.createIndex(); // optional, but required before seeking
+    expect(ulog.messageCount()).toBe(64599); // ex: 64599
+    expect(ulog.timeRange()).toEqual([0n, 181493506n]); // ex: [ 0n, 181493506n ]
+
+    const firstMessage = (await ulog.readMessage())!;
+    // ex: { size: 19, type: MessageType.AddLogged, multiId: 0, msgId: 0,
+    //       messageName: 'vehicle_attitude' }
+    expect((firstMessage as MessageAddLogged).messageName).toBe("vehicle_attitude");
+
+    // seeks to the first message at or before the 500us timestamp
+    ulog.seekToTime(500n);
+
+    const msgIdCounts = new Map<number, number>();
+    for await (const msg of ulog.messages()) {
+      if (msg.type === MessageType.Data) {
+        // NOTE: `msg.value` holds the deserialized message
+        msgIdCounts.set(msg.msgId, (msgIdCounts.get(msg.msgId) ?? 0) + 1);
+      }
+    }
+    const msgCounts = Array.from(msgIdCounts.entries()).map(([id, count]) => [
+      ulog.subscriptions.get(id)!.name,
+      count,
+    ]);
+    expect(msgCounts).toEqual([
+      ["vehicle_attitude", 6461],
+      ["actuator_outputs", 1311],
+      ["telemetry_status", 70],
+      ["vehicle_status", 294],
+      ["commander_state", 678],
+      ["vehicle_attitude_setpoint", 3272],
+      ["vehicle_rates_setpoint", 6448],
+      ["actuator_controls_0", 3269],
+      ["vehicle_local_position", 678],
+      ["ekf2_innovations", 3271],
+      ["sensor_preflight", 17072],
+      ["sensor_combined", 17070],
+      ["control_state", 3268],
+      ["estimator_status", 1311],
+      ["cpuload", 69],
+    ]);
+  });
+});
