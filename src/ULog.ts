@@ -64,6 +64,7 @@ export class ULog {
   private _dataStart?: number;
   private _dataEnd?: number;
   private _header?: ULogHeader;
+  private _appendedOffsets?: [number, number, number];
   private _subscriptions = new Map<number, MessageDefinition>();
   private _timeIndex?: AVLTree<bigint, number>; // An ordered map from timestamp to message index for all DATA section messages with timestamps
   private _positionIndex?: number[]; // Stores byte offsets for all DATA section messages
@@ -173,16 +174,18 @@ export class ULog {
       }
     }
 
-    const appendedOffsets = flagBits
-      ? [
-          Number(flagBits.appendedOffsets[0]),
-          Number(flagBits.appendedOffsets[1]),
-          Number(flagBits.appendedOffsets[2]),
-        ]
-      : [];
+    // File offsets are stored as 64-bit unsigned integers, but we cast to Number here which safely
+    // stores up to 53-bit integers. This supports ulogs up to 8192 TB in length
+    const appendedOffsets = flagBits?.appendedOffsets ?? [0n, 0n, 0n];
+    this._appendedOffsets = appendedOffsets.map((n) => Number(n)) as [number, number, number];
+    const firstOffset = this._appendedOffsets[0];
 
     this._dataStart = this._reader.position();
-    this._dataEnd = Math.min(...appendedOffsets, this._reader.size());
+    this._dataEnd = this._reader.size();
+    if (firstOffset > 0 && firstOffset < this._dataEnd) {
+      this._dataEnd = firstOffset;
+    }
+
     this._header = { version, timestamp, flagBits, information, parameters, definitions };
     return this._header;
   }
