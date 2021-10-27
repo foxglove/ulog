@@ -2,7 +2,7 @@
 
 > _PX4 ULog file reader_
 
-TODO
+A web and node.js TypeScript library for reading [PX4 ULog](https://docs.px4.io/master/en/dev_log/ulog_file_format.html) files, from the PX4 Autopilot system for drones and other autonomous vehicles.
 
 ## Usage
 
