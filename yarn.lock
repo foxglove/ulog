@@ -324,6 +324,11 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
+"@foxglove/avl@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@foxglove/avl/-/avl-1.0.0.tgz#1fbc86fbda1caf1e89efc89bc349e93d1431788d"
+  integrity sha512-5lV6ZzeiCgtTlEOsoxqvBN6B8S91AyOMS68ImUrETSalmFKOM5XO8YhPMWsUW0QR3431CwQhKa2buSCu2TFcfA==
+
 "@foxglove/eslint-plugin@0.17.1":
   version "0.17.1"
   resolved "https://registry.yarnpkg.com/@foxglove/eslint-plugin/-/eslint-plugin-0.17.1.tgz#f29fbe7bf538f2721535a9c06ec6ec607ad72f71"

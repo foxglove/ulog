@@ -64,7 +64,7 @@ describe("ULog", () => {
     void reader.close();
   });
 
-  it("readMessage()", async () => {
+  it("readRawMessage()", async () => {
     const reader = new FileReader(sampleFixture);
     const ulog = new ULog(reader);
     await ulog.open();
@@ -73,7 +73,43 @@ describe("ULog", () => {
     while ((message = await ulog.readRawMessage())) {
       messages.push(message);
     }
-    expect(messages.length).toBe(64492);
+    expect(messages.length).toBe(64599);
+
+    void reader.close();
+  });
+
+  it("readMessage()", async () => {
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+    const messages: Message[] = [];
+    let message: Message | undefined;
+    while ((message = await ulog.readMessage())) {
+      messages.push(message);
+    }
+    expect(messages.length).toBe(64599);
+
+    void reader.close();
+  });
+
+  it("createIndex()", async () => {
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+
+    expect(ulog.messageCount()).toBeUndefined();
+    expect(ulog.timeRange()).toBeUndefined();
+    await ulog.createIndex();
+    expect(ulog.messageCount()).toBe(64599);
+    expect(Number(ulog.timeRange()![0])).toEqual(0);
+    expect(Number(ulog.timeRange()![1])).toEqual(181493506);
+
+    expect(ulog.seekToTime(0n)).toBe(53);
+    ulog.seekToMessage(0);
+    ulog.seekToMessage(ulog.messageCount()! - 1);
+    expect((await ulog.readMessage())!.type).toBe(MessageType.Data);
+    expect(await ulog.readMessage()).toBeUndefined();
+    expect(ulog.seekToTime(0n)).toBe(53);
 
     void reader.close();
   });

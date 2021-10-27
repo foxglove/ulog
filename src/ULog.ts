@@ -1,3 +1,5 @@
+import { AVLTree } from "@foxglove/avl";
+
 import { ChunkedReader } from "./ChunkedReader";
 import {
   Field,
@@ -60,8 +62,11 @@ type MessageHeader = {
 export class ULog {
   private _reader: ChunkedReader;
   private _dataStart?: number;
+  private _dataEnd?: number;
   private _header?: ULogHeader;
   private _subscriptions = new Map<number, MessageDefinition>();
+  private _timeIndex?: AVLTree<bigint, number>; // An ordered map from timestamp to message index for all DATA section messages with timestamps
+  private _positionIndex?: number[]; // Stores byte offsets for all DATA section messages
 
   constructor(filelike: Filelike) {
     this._reader = new ChunkedReader(filelike);
@@ -168,9 +173,65 @@ export class ULog {
       }
     }
 
+    const appendedOffsets = flagBits
+      ? [
+          Number(flagBits.appendedOffsets[0]),
+          Number(flagBits.appendedOffsets[1]),
+          Number(flagBits.appendedOffsets[2]),
+        ]
+      : [];
+
     this._dataStart = this._reader.position();
+    this._dataEnd = Math.min(...appendedOffsets, this._reader.size());
     this._header = { version, timestamp, flagBits, information, parameters, definitions };
     return this._header;
+  }
+
+  async createIndex(): Promise<void> {
+    if (this._dataStart == undefined || this._dataEnd == undefined) {
+      throw new Error(`Cannot create index before open`);
+    }
+
+    const timeIndex = new AVLTree<bigint, number>();
+    const positionIndex: number[] = [];
+
+    for await (const message of this.messages()) {
+      if (message.type === MessageType.Data) {
+        const timestamp = (message.value as { timestamp?: bigint }).timestamp;
+        if (timestamp != undefined) {
+          if (!timeIndex.has(timestamp)) {
+            timeIndex.set(timestamp, positionIndex.length);
+          }
+        }
+      } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
+        const timestamp = message.timestamp;
+        if (!timeIndex.has(timestamp)) {
+          timeIndex.set(timestamp, positionIndex.length);
+        }
+      }
+
+      const msgPos = this._reader.position() - message.size - 3;
+      positionIndex.push(msgPos);
+    }
+
+    this._timeIndex = timeIndex;
+    this._positionIndex = positionIndex;
+  }
+
+  async *messages(): AsyncIterableIterator<DataSectionMessage> {
+    if (this._dataStart == undefined) {
+      throw new Error(`Cannot read before open`);
+    }
+
+    const originalPosition = this._reader.position();
+    this._reader.seekTo(this._dataStart);
+
+    let message: DataSectionMessage | undefined;
+    while ((message = await this.readMessage())) {
+      yield message;
+    }
+
+    this._reader.seekTo(originalPosition);
   }
 
   async readMessage(): Promise<DataSectionMessage | undefined> {
@@ -210,7 +271,11 @@ export class ULog {
   }
 
   async readRawMessage(): Promise<Message | undefined> {
-    if (this._reader.remaining() < 3) {
+    if (this._dataEnd != undefined) {
+      if (this._dataEnd - this._reader.position() < 3) {
+        return undefined;
+      }
+    } else if (this._reader.remaining() < 3) {
       return undefined;
     }
 
@@ -230,11 +295,7 @@ export class ULog {
         return await this.readMessageParameterDefault(header);
       case MessageType.AddLogged: {
         const subscribe = await this.readMessageAddLogged(header);
-        const definition = this._header?.definitions.get(subscribe.messageName);
-        if (!definition) {
-          throw new Error(`AddLogged unknown message_name: ${subscribe.messageName}`);
-        }
-        this._subscriptions.set(subscribe.msgId, definition);
+        this.handleSubscription(subscribe);
         return subscribe;
       }
       case MessageType.RemoveLogged:
@@ -255,14 +316,70 @@ export class ULog {
     }
   }
 
-  seekToMessage(index: number): void {
-    if (index !== 0) {
-      throw new Error(`Seeking not supported yet`);
+  messageCount(): number | undefined {
+    return this._positionIndex?.length;
+  }
+
+  timeRange(): [bigint, bigint] | undefined {
+    const timeIndex = this._timeIndex;
+    const start = timeIndex?.minKey();
+    const end = timeIndex?.maxKey();
+    if (start == undefined || end == undefined) {
+      return undefined;
     }
+    return [start, end];
+  }
+
+  seekToMessage(index: number): void {
     if (this._dataStart == undefined) {
       throw new Error(`Cannot seek before open`);
     }
-    this._reader.seekTo(this._dataStart);
+
+    if (index === 0) {
+      this._reader.seekTo(this._dataStart);
+      return;
+    }
+
+    const positionIndex = this._positionIndex;
+    if (!positionIndex) {
+      throw new Error(`Cannot seek before createIndex`);
+    }
+
+    if (index < 0 || index >= positionIndex.length) {
+      throw new Error(`Invalid index ${index}, ${positionIndex.length} messages total`);
+    }
+
+    const byteOffset = positionIndex[index]!;
+    this._reader.seekTo(byteOffset);
+  }
+
+  seekToTime(timestamp: bigint): number {
+    if (this._dataStart == undefined) {
+      throw new Error(`Cannot seek before open`);
+    }
+
+    const timeIndex = this._timeIndex;
+    if (!timeIndex) {
+      throw new Error(`Cannot seek before createIndex`);
+    }
+
+    const res = timeIndex.findLessThanOrEqual(timestamp);
+    if (!res) {
+      this._reader.seekTo(this._dataStart);
+      return 0;
+    }
+
+    const index = res[1];
+    this.seekToMessage(index);
+    return index;
+  }
+
+  private handleSubscription(subscribe: MessageAddLogged): void {
+    const definition = this._header?.definitions.get(subscribe.messageName);
+    if (!definition) {
+      throw new Error(`AddLogged unknown message_name: ${subscribe.messageName}`);
+    }
+    this._subscriptions.set(subscribe.msgId, definition);
   }
 
   private async isDataSectionStart(): Promise<boolean> {

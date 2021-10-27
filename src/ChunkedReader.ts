@@ -21,8 +21,12 @@ export class ChunkedReader {
     return this._fileCursor - (this._chunk?.byteLength ?? 0) + this._chunkCursor;
   }
 
+  size(): number {
+    return this._file.size();
+  }
+
   remaining(): number {
-    return this._file.size() - this._fileCursor;
+    return this.size() - this._fileCursor;
   }
 
   seek(relativeByteOffset: number): void {
@@ -37,6 +41,11 @@ export class ChunkedReader {
     this._chunkCursor = 0;
     this._chunk = undefined;
     this._view = undefined;
+  }
+
+  async skip(count: number): Promise<void> {
+    await this.view(count);
+    this._chunkCursor += count;
   }
 
   async peek(count: number): Promise<DataView> {

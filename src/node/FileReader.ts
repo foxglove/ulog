@@ -9,7 +9,6 @@ export class FileReader implements Filelike {
   private _filename: string;
   private _file?: fs.FileHandle;
   private _size = 0;
-  private _buffer = new Uint8Array(0);
 
   constructor(filename: string) {
     this._filename = filename;
@@ -38,11 +37,9 @@ export class FileReader implements Filelike {
   async read(offset: number, length: number): Promise<Uint8Array> {
     const file = await this.open();
     const readLength = Math.min(length, this._size - offset);
-    if (readLength > this._buffer.byteLength) {
-      this._buffer = new Uint8Array(readLength);
-    }
-    const res = await file.read(this._buffer, 0, readLength, offset);
-    return this._buffer.slice(0, res.bytesRead);
+    const data = new Uint8Array(readLength);
+    const res = await file.read(data, 0, readLength, offset);
+    return data.byteLength === res.bytesRead ? data : data.slice(0, res.bytesRead);
   }
 
   size(): number {
