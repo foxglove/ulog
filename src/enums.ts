@@ -1,4 +1,5 @@
 export enum MessageType {
+  Unknown = 0,
   FlagBits = 0x42, // 'B'
   Information = 0x49, // 'I'
   FormatDefinition = 0x46, // 'F'

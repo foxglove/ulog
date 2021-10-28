@@ -1,17 +1,6 @@
 import { Field, MessageDefinition } from "./definition";
 import { BuiltinType } from "./enums";
-import { MessageData } from "./messages";
-
-export type FieldPrimitive = boolean | number | bigint | string | FieldPrimitive[];
-export interface FieldStruct {
-  [key: string]: FieldPrimitive | FieldStruct | FieldArray;
-}
-export type FieldArray = Array<FieldPrimitive | FieldStruct>;
-export type FieldValue = FieldPrimitive | FieldStruct | FieldArray;
-
-export type MessageDataParsed = MessageData & {
-  value: FieldValue;
-};
+import { FieldPrimitive, FieldStruct, FieldValue, ParsedMessage } from "./messages";
 
 const textDecoder = new TextDecoder();
 
@@ -20,7 +9,7 @@ export function parseMessage(
   definitions: Map<string, MessageDefinition>,
   view: DataView,
   offset = 0,
-): FieldStruct {
+): ParsedMessage {
   const output: FieldStruct = {};
   let curOffset = offset;
   for (const field of definition.fields) {
@@ -30,7 +19,10 @@ export function parseMessage(
     output[field.name] = parseFieldValue(field, definitions, view, curOffset);
     curOffset += fieldSize(field, definitions);
   }
-  return output;
+  if (typeof output.timestamp !== "bigint") {
+    throw new Error(`Message "${definition.name}" is missing a timestamp field`);
+  }
+  return output as ParsedMessage;
 }
 
 export function parseFieldValue(
@@ -46,9 +38,9 @@ export function parseFieldValue(
     }
     if (field.arrayLength != undefined) {
       const size = fieldSize(field, definitions);
-      const output: FieldStruct[] = [];
+      const output = new Array<FieldStruct>(field.arrayLength);
       for (let i = 0; i < field.arrayLength; i++) {
-        output.push(parseMessage(definition, definitions, view, offset + i * size));
+        output[i] = parseMessage(definition, definitions, view, offset + i * size);
       }
     }
 
@@ -70,9 +62,9 @@ export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): 
     }
 
     const basicSize = basicFieldSize(basicType, undefined);
-    const output: FieldPrimitive[] = [];
+    const output = new Array<FieldPrimitive>();
     for (let i = 0; i < field.arrayLength; i++) {
-      output.push(parseBasic(basicType, view, offset + i * basicSize));
+      output[i] = parseBasic(basicType, view, offset + i * basicSize);
     }
     return output;
   }

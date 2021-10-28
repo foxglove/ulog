@@ -24,6 +24,7 @@ export type Field = {
 export type MessageDefinition = {
   name: string;
   fields: Field[];
+  format: string;
 };
 
 export function parseMessageDefinition(format: string): MessageDefinition | undefined {
@@ -46,7 +47,7 @@ export function parseMessageDefinition(format: string): MessageDefinition | unde
     fields.push(definition);
   }
 
-  return { name, fields };
+  return { name, fields, format };
 }
 
 export function parseFieldDefinition(fieldString: string): Field | undefined {

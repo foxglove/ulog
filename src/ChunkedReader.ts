@@ -1,6 +1,6 @@
 import { Filelike } from "./file";
 
-const CHUNK_SIZE = 16384;
+const CHUNK_SIZE = 256 * 1024;
 
 export class ChunkedReader {
   readonly chunkSize: number;
@@ -48,9 +48,9 @@ export class ChunkedReader {
     this._chunkCursor += count;
   }
 
-  async peek(count: number): Promise<DataView> {
-    const view = await this.view(count);
-    return new DataView(view.buffer, view.byteOffset + this._chunkCursor, count);
+  async peekUint8(offset: number): Promise<number> {
+    const view = await this.view(offset + 1);
+    return view.getUint8(this._chunkCursor + offset);
   }
 
   async readBytes(count: number): Promise<Uint8Array> {

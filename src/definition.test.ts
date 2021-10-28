@@ -13,11 +13,12 @@ describe("definition", () => {
   });
 
   it("parseMessageDefinition", async () => {
-    const msgdef = parseMessageDefinition(
-      "esc_status:uint64_t timestamp;uint16_t counter;uint8_t esc_count;uint8_t esc_connectiontype;uint8_t[4] _padding0;esc_report[8] esc;",
-    )!;
+    const format =
+      "esc_status:uint64_t timestamp;uint16_t counter;uint8_t esc_count;uint8_t esc_connectiontype;uint8_t[4] _padding0;esc_report[8] esc;";
+    const msgdef = parseMessageDefinition(format)!;
     expect(msgdef).toBeDefined();
     expect(msgdef.name).toBe("esc_status");
+    expect(msgdef.format).toBe(format);
     expect(msgdef.fields.length).toBe(6);
     expect(msgdef.fields[0]!.type).toBe("uint64_t");
     expect(msgdef.fields[0]!.name).toBe("timestamp");

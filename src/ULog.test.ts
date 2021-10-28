@@ -1,11 +1,9 @@
 import path from "path";
 
 import { ULog } from "./ULog";
-import { MessageDefinition } from "./definition";
 import { MessageType } from "./enums";
-import { Message, MessageAddLogged, MessageData } from "./messages";
+import { MessageAddLogged, MessageDataParsed } from "./messages";
 import { FileReader } from "./node/FileReader";
-import { MessageDataParsed, messageSize } from "./parse";
 
 describe("ULog sample.ulg", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
@@ -13,7 +11,8 @@ describe("ULog sample.ulg", () => {
   it("open()", async () => {
     const reader = new FileReader(sampleFixture);
     const ulog = new ULog(reader);
-    const header = await ulog.open();
+    await ulog.open();
+    const header = ulog.header!;
 
     expect(header.version).toBe(0);
     expect(header.timestamp).toBe(112500176n);
@@ -64,55 +63,23 @@ describe("ULog sample.ulg", () => {
     void reader.close();
   });
 
-  it("readRawMessage()", async () => {
+  it("readMessages()", async () => {
     const reader = new FileReader(sampleFixture);
     const ulog = new ULog(reader);
     await ulog.open();
-    const messages: Message[] = [];
-    let message: Message | undefined;
-    while ((message = await ulog.readRawMessage())) {
-      messages.push(message);
+
+    let prevTimestamp = 0n;
+    for await (const msg of ulog.readMessages()) {
+      if (msg.type === MessageType.Data) {
+        // eslint-disable-next-line jest/no-conditional-expect
+        expect(msg.value.timestamp).toBeGreaterThanOrEqual(prevTimestamp);
+        prevTimestamp = msg.value.timestamp;
+      } else if (msg.type === MessageType.Log || msg.type === MessageType.LogTagged) {
+        // eslint-disable-next-line jest/no-conditional-expect
+        expect(msg.timestamp).toBeGreaterThanOrEqual(prevTimestamp);
+        prevTimestamp = msg.timestamp;
+      }
     }
-    expect(messages.length).toBe(64599);
-
-    void reader.close();
-  });
-
-  it("readMessage()", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-    const messages: Message[] = [];
-    let message: Message | undefined;
-    while ((message = await ulog.readMessage())) {
-      messages.push(message);
-    }
-    expect(messages.length).toBe(64599);
-
-    void reader.close();
-  });
-
-  it("createIndex()", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-
-    expect(ulog.messageCount()).toBeUndefined();
-    expect(ulog.timeRange()).toBeUndefined();
-    await ulog.createIndex();
-    expect(ulog.messageCount()).toBe(64599);
-    expect(Number(ulog.timeRange()![0])).toEqual(0);
-    expect(Number(ulog.timeRange()![1])).toEqual(181493506);
-
-    expect(ulog.seekToTime(0n)).toBe(53);
-    ulog.seekToMessage(0);
-    ulog.seekToMessage(ulog.messageCount()! - 1);
-    const lastMsg = (await ulog.readMessage()) as MessageDataParsed;
-    expect(lastMsg.type).toBe(MessageType.Data);
-    expect(lastMsg.msgId).toBe(38);
-    expect(lastMsg.data.byteLength).toBe(72);
-    expect(await ulog.readMessage()).toBeUndefined();
-    expect(ulog.seekToTime(0n)).toBe(53);
 
     void reader.close();
   });
@@ -122,32 +89,20 @@ describe("ULog sample.ulg", () => {
     const ulog = new ULog(reader);
     await ulog.open();
 
-    const subscribe = (await ulog.readRawMessage()) as MessageAddLogged;
-    expect(subscribe.type).toBe(MessageType.AddLogged);
-    expect(subscribe.size).toBe(19);
-    expect(subscribe.multiId).toBe(0);
-    expect(subscribe.msgId).toBe(0);
-    expect(subscribe.messageName).toBe("vehicle_attitude");
-
-    void reader.close();
-  });
-
-  it("MessageData", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-
-    for (let i = 0; i < 43; i++) {
-      await ulog.readRawMessage();
+    let subscribe: MessageAddLogged | undefined;
+    for await (const msg of ulog.readMessages()) {
+      if (msg.type === MessageType.AddLogged) {
+        subscribe = msg;
+        break;
+      }
     }
 
-    const data = (await ulog.readRawMessage()) as MessageData;
-    expect(data.type).toBe(MessageType.Data);
-    expect(data.size).toBe(38);
-    expect(data.msgId).toBe(0);
-    expect(data.data.byteLength).toBe(36);
-    expect(data.data[0]).toBe(0x63);
-    expect(data.data[35]).toBe(0xbe);
+    expect(subscribe).toBeDefined();
+    expect(subscribe!.type).toBe(MessageType.AddLogged);
+    expect(subscribe!.size).toBe(19);
+    expect(subscribe!.multiId).toBe(0);
+    expect(subscribe!.msgId).toBe(0);
+    expect(subscribe!.messageName).toBe("vehicle_attitude");
 
     void reader.close();
   });
@@ -157,23 +112,22 @@ describe("ULog sample.ulg", () => {
     const ulog = new ULog(reader);
     await ulog.open();
 
-    for (let i = 0; i < 43; i++) {
-      await ulog.readRawMessage();
+    let data: MessageDataParsed | undefined;
+    for await (const msg of ulog.readMessages()) {
+      if (msg.type === MessageType.Data && msg.msgId === 0) {
+        data = msg;
+        break;
+      }
     }
 
-    expect(ulog.subscriptions.get(0)?.name).toBe("vehicle_attitude");
-    const definition = ulog.header?.definitions.get("vehicle_attitude") as MessageDefinition;
-    expect(definition).toBeDefined();
-    expect(messageSize(definition, ulog.header!.definitions)).toBe(40);
-
-    const data = (await ulog.readMessage()) as MessageDataParsed;
-    expect(data.type).toBe(MessageType.Data);
-    expect(data.size).toBe(38);
-    expect(data.msgId).toBe(0);
-    expect(data.data.byteLength).toBe(36);
-    expect(data.data[0]).toBe(0x63);
-    expect(data.data[35]).toBe(0xbe);
-    expect(data.value).toEqual({
+    expect(data).toBeDefined();
+    expect(data!.type).toBe(MessageType.Data);
+    expect(data!.size).toBe(38);
+    expect(data!.msgId).toBe(0);
+    expect(data!.data.byteLength).toBe(36);
+    expect(data!.data[0]).toBe(99);
+    expect(data!.data[data!.data.byteLength - 1]).toBe(190);
+    expect(data!.value).toEqual({
       timestamp: 112574307n,
       rollspeed: -0.0004259266424924135,
       pitchspeed: 0.000473720021545887,
@@ -191,7 +145,8 @@ describe("ULog sample_appended.ulg", () => {
   it("open()", async () => {
     const reader = new FileReader(sampleFixture);
     const ulog = new ULog(reader);
-    const header = await ulog.open();
+    await ulog.open();
+    const header = ulog.header!;
 
     expect(header.version).toBe(1);
     expect(header.timestamp).toBe(5115156n);
@@ -308,59 +263,6 @@ describe("ULog sample_appended.ulg", () => {
 
     void reader.close();
   });
-
-  it("readRawMessage()", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-    const messages: Message[] = [];
-    let message: Message | undefined;
-    while ((message = await ulog.readRawMessage())) {
-      messages.push(message);
-    }
-    expect(messages.length).toBe(81334);
-
-    void reader.close();
-  });
-
-  it("readMessage()", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-    const messages: Message[] = [];
-    let message: Message | undefined;
-    while ((message = await ulog.readMessage())) {
-      messages.push(message);
-    }
-    expect(messages.length).toBe(81334);
-
-    void reader.close();
-  });
-
-  it("createIndex()", async () => {
-    const reader = new FileReader(sampleFixture);
-    const ulog = new ULog(reader);
-    await ulog.open();
-
-    expect(ulog.messageCount()).toBeUndefined();
-    expect(ulog.timeRange()).toBeUndefined();
-    await ulog.createIndex();
-    expect(ulog.messageCount()).toBe(81334);
-    expect(Number(ulog.timeRange()![0])).toEqual(0);
-    expect(Number(ulog.timeRange()![1])).toEqual(120039907);
-
-    expect(ulog.seekToTime(0n)).toBe(51);
-    ulog.seekToMessage(0);
-    ulog.seekToMessage(ulog.messageCount()! - 1);
-    const lastMsg = (await ulog.readMessage()) as MessageDataParsed;
-    expect(lastMsg.type).toBe(MessageType.Data);
-    expect(lastMsg.msgId).toBe(39);
-    expect(lastMsg.data.byteLength).toBe(72);
-    expect(await ulog.readMessage()).toBeUndefined();
-    expect(ulog.seekToTime(0n)).toBe(51);
-
-    void reader.close();
-  });
 });
 
 describe("README.md", () => {
@@ -369,45 +271,38 @@ describe("README.md", () => {
   it("example code works", async () => {
     const ulog = new ULog(new FileReader(sampleFixture));
     await ulog.open(); // required before any other operations
-    await ulog.createIndex(); // optional, but required before seeking
     expect(ulog.messageCount()).toBe(64599); // ex: 64599
     expect(ulog.timeRange()).toEqual([0n, 181493506n]); // ex: [ 0n, 181493506n ]
 
-    const firstMessage = (await ulog.readMessage())!;
-    // ex: { size: 19, type: MessageType.AddLogged, multiId: 0, msgId: 0,
-    //       messageName: 'vehicle_attitude' }
-    expect((firstMessage as MessageAddLogged).messageName).toBe("vehicle_attitude");
-
-    // seeks to the first message at or before the 500us timestamp
-    ulog.seekToTime(500n);
-
     const msgIdCounts = new Map<number, number>();
-    for await (const msg of ulog.messages()) {
+    for await (const msg of ulog.readMessages()) {
       if (msg.type === MessageType.Data) {
         // NOTE: `msg.value` holds the deserialized message
         msgIdCounts.set(msg.msgId, (msgIdCounts.get(msg.msgId) ?? 0) + 1);
       }
     }
-    const msgCounts = Array.from(msgIdCounts.entries()).map(([id, count]) => [
-      ulog.subscriptions.get(id)!.name,
-      count,
-    ]);
-    expect(msgCounts).toEqual([
-      ["vehicle_attitude", 6461],
-      ["actuator_outputs", 1311],
-      ["telemetry_status", 70],
-      ["vehicle_status", 294],
-      ["commander_state", 678],
-      ["vehicle_attitude_setpoint", 3272],
-      ["vehicle_rates_setpoint", 6448],
-      ["actuator_controls_0", 3269],
-      ["vehicle_local_position", 678],
-      ["ekf2_innovations", 3271],
-      ["sensor_preflight", 17072],
-      ["sensor_combined", 17070],
-      ["control_state", 3268],
-      ["estimator_status", 1311],
-      ["cpuload", 69],
-    ]);
+    const msgCounts = Object.fromEntries(
+      Array.from(msgIdCounts.entries()).map(([id, count]) => [
+        ulog.subscriptions.get(id)!.name,
+        count,
+      ]),
+    );
+    expect(msgCounts).toEqual({
+      vehicle_attitude: 6461,
+      actuator_outputs: 1311,
+      telemetry_status: 70,
+      vehicle_status: 294,
+      commander_state: 678,
+      vehicle_attitude_setpoint: 3272,
+      vehicle_rates_setpoint: 6448,
+      actuator_controls_0: 3269,
+      vehicle_local_position: 678,
+      ekf2_innovations: 3271,
+      sensor_preflight: 17072,
+      sensor_combined: 17070,
+      control_state: 3268,
+      estimator_status: 1311,
+      cpuload: 69,
+    });
   });
 });

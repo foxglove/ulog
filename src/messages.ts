@@ -3,6 +3,15 @@ import { MessageType, LogLevel } from "./enums";
 export type SyncMagic = [0x2f, 0x73, 0x13, 0x20, 0x25, 0x0c, 0xbb, 0x12];
 export type BitFlags = [number, number, number, number, number, number, number, number];
 
+export type FieldPrimitive = boolean | number | bigint | string | FieldPrimitive[];
+export interface FieldStruct {
+  [key: string]: FieldPrimitive | FieldStruct | FieldArray;
+}
+export type FieldArray = Array<FieldPrimitive | FieldStruct>;
+export type FieldValue = FieldPrimitive | FieldStruct | FieldArray;
+
+export type ParsedMessage = FieldStruct & { timestamp: bigint };
+
 export type MessageFlagBits = {
   size: number;
   type: MessageType.FlagBits;
@@ -57,7 +66,7 @@ export type MessageAddLogged = {
 
 export type MessageRemoveLogged = {
   size: number;
-  type: MessageType.AddLogged;
+  type: MessageType.RemoveLogged;
   msgId: number;
 };
 
@@ -99,8 +108,13 @@ export type MessageDropout = {
 
 export type MessageUnknown = {
   size: number;
-  type: number;
+  type: MessageType.Unknown;
+  unknownType: number;
   data: Uint8Array;
+};
+
+export type MessageDataParsed = MessageData & {
+  value: ParsedMessage;
 };
 
 export type Message =
@@ -113,6 +127,16 @@ export type Message =
   | MessageAddLogged
   | MessageRemoveLogged
   | MessageData
+  | MessageLog
+  | MessageLogTagged
+  | MessageSynchronization
+  | MessageDropout
+  | MessageUnknown;
+
+export type DataSectionMessage =
+  | MessageAddLogged
+  | MessageRemoveLogged
+  | MessageDataParsed
   | MessageLog
   | MessageLogTagged
   | MessageSynchronization
