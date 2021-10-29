@@ -269,7 +269,8 @@ describe("README.md", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
 
   it("example code works", async () => {
-    const ulog = new ULog(new FileReader(sampleFixture));
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
     await ulog.open(); // required before any other operations
     expect(ulog.messageCount()).toBe(64599); // ex: 64599
     expect(ulog.timeRange()).toEqual([0n, 181493506n]); // ex: [ 0n, 181493506n ]
@@ -304,5 +305,7 @@ describe("README.md", () => {
       estimator_status: 1311,
       cpuload: 69,
     });
+
+    await reader.close();
   });
 });
