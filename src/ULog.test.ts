@@ -5,6 +5,8 @@ import { MessageType } from "./enums";
 import { MessageAddLogged, MessageDataParsed } from "./messages";
 import { FileReader } from "./node/FileReader";
 
+jest.setTimeout(1000 * 20);
+
 describe("ULog sample.ulg", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
 
