@@ -2,6 +2,36 @@ import { Field, MessageDefinition } from "./definition";
 import { BuiltinType } from "./enums";
 import { FieldPrimitive, FieldStruct, FieldValue, ParsedMessage } from "./messages";
 
+const BASIC_PARSERS = {
+  bool: (view: DataView, offset: number) => view.getUint8(offset) !== 0,
+  int8_t: (view: DataView, offset: number) => view.getInt8(offset),
+  uint8_t: (view: DataView, offset: number) => view.getUint8(offset),
+  int16_t: (view: DataView, offset: number) => view.getInt16(offset, true),
+  uint16_t: (view: DataView, offset: number) => view.getUint16(offset, true),
+  int32_t: (view: DataView, offset: number) => view.getInt32(offset, true),
+  uint32_t: (view: DataView, offset: number) => view.getUint32(offset, true),
+  int64_t: (view: DataView, offset: number) => view.getBigInt64(offset, true),
+  uint64_t: (view: DataView, offset: number) => view.getBigUint64(offset, true),
+  float: (view: DataView, offset: number) => view.getFloat32(offset, true),
+  double: (view: DataView, offset: number) => view.getFloat64(offset, true),
+  char: (view: DataView, offset: number) => String.fromCharCode(view.getUint8(offset)),
+};
+
+const BASIC_SIZES = {
+  bool: 1,
+  int8_t: 1,
+  uint8_t: 1,
+  int16_t: 2,
+  uint16_t: 2,
+  int32_t: 4,
+  uint32_t: 4,
+  int64_t: 8,
+  uint64_t: 8,
+  float: 4,
+  double: 8,
+  char: 1,
+};
+
 const textDecoder = new TextDecoder();
 
 export function parseMessage(
@@ -17,7 +47,7 @@ export function parseMessage(
       continue;
     }
     output[field.name] = parseFieldValue(field, definitions, view, curOffset);
-    curOffset += fieldSize(field, definitions);
+    curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
   }
   if (typeof output.timestamp !== "bigint") {
     throw new Error(`Message "${definition.name}" is missing a timestamp field`);
@@ -42,6 +72,7 @@ export function parseFieldValue(
       for (let i = 0; i < field.arrayLength; i++) {
         output[i] = parseMessage(definition, definitions, view, offset + i * size);
       }
+      return output;
     }
 
     return parseMessage(definition, definitions, view, offset);
@@ -61,50 +92,15 @@ export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): 
       return textDecoder.decode(new Uint8Array(view.buffer, byteOffset, len));
     }
 
-    const basicSize = basicFieldSize(basicType, undefined);
+    const basicSize = BASIC_SIZES[basicType];
     const output = new Array<FieldPrimitive>();
     for (let i = 0; i < field.arrayLength; i++) {
-      output[i] = parseBasic(basicType, view, offset + i * basicSize);
+      output[i] = BASIC_PARSERS[basicType](view, offset + i * basicSize);
     }
     return output;
   }
 
-  return parseBasic(basicType, view, offset);
-}
-
-function parseBasic(
-  fieldType: BuiltinType,
-  view: DataView,
-  offset: number,
-): string | number | bigint | boolean {
-  switch (fieldType) {
-    case "bool":
-      return view.getUint8(offset) !== 0;
-    case "int8_t":
-      return view.getInt8(offset);
-    case "uint8_t":
-      return view.getUint8(offset);
-    case "int16_t":
-      return view.getInt16(offset, true);
-    case "uint16_t":
-      return view.getUint16(offset, true);
-    case "int32_t":
-      return view.getInt32(offset, true);
-    case "uint32_t":
-      return view.getUint32(offset, true);
-    case "int64_t":
-      return view.getBigInt64(offset, true);
-    case "uint64_t":
-      return view.getBigUint64(offset, true);
-    case "float":
-      return view.getFloat32(offset, true);
-    case "double":
-      return view.getFloat64(offset, true);
-    case "char":
-      return String.fromCharCode(view.getUint8(offset));
-    default:
-      throw new Error(`Unrecognized basic type "${fieldType as string}"`);
-  }
+  return BASIC_PARSERS[basicType](view, offset);
 }
 
 export function messageSize(
@@ -126,31 +122,8 @@ export function fieldSize(field: Field, definitions: Map<string, MessageDefiniti
     }
     field.size = messageSize(definition, definitions);
   } else {
-    field.size = basicFieldSize(field.type as BuiltinType, field.arrayLength);
+    field.size = BASIC_SIZES[field.type as BuiltinType];
   }
 
   return field.size;
-}
-
-export function basicFieldSize(type: BuiltinType, arrayLength: number | undefined): number {
-  switch (type) {
-    case "bool":
-    case "int8_t":
-    case "uint8_t":
-    case "char":
-      return arrayLength ?? 1;
-    case "int16_t":
-    case "uint16_t":
-      return 2 * (arrayLength ?? 1);
-    case "int32_t":
-    case "uint32_t":
-    case "float":
-      return 4 * (arrayLength ?? 1);
-    case "int64_t":
-    case "uint64_t":
-    case "double":
-      return 8 * (arrayLength ?? 1);
-    default:
-      throw new Error(`Unrecognized basic type "${type as string}"`);
-  }
 }

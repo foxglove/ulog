@@ -265,6 +265,19 @@ describe("ULog sample_appended.ulg", () => {
   });
 });
 
+describe("log_6_2021-7-20-11-41-56.ulg", () => {
+  const sampleFixture = path.join(__dirname, "..", "tests", "log_6_2021-7-20-11-41-56.ulg");
+
+  it("should parse", async () => {
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+    expect(ulog.messageCount()).toBe(1023911);
+
+    await reader.close();
+  });
+});
+
 describe("README.md", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
 
