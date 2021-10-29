@@ -136,7 +136,7 @@ export async function readMessageInformationMulti(
   }
 
   const key = await reader.readString(keyLen);
-  const value = await reader.readBytes(header.size - 1 - keyLen);
+  const value = await reader.readBytes(header.size - 2 - keyLen);
   return { size: header.size, type: header.type, isContinued, key, value };
 }
 
