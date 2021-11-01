@@ -21,6 +21,10 @@ export class ChunkedReader {
     return await this._file.open();
   }
 
+  view(): DataView | undefined {
+    return this._view;
+  }
+
   position(): number {
     return this._fileCursor - (this._chunk?.byteLength ?? 0) + this._chunkCursor;
   }
@@ -62,85 +66,85 @@ export class ChunkedReader {
       throw new Error(`Cannot skip ${count} bytes`);
     }
 
-    await this.view(count);
+    await this.fetch(count);
     this._chunkCursor += count;
   }
 
   async peekUint8(offset: number): Promise<number> {
-    const view = await this.view(offset + 1);
+    const view = await this.fetch(offset + 1);
     return view.getUint8(this._chunkCursor + offset);
   }
 
   async readBytes(count: number): Promise<Uint8Array> {
-    const view = await this.view(count);
+    const view = await this.fetch(count);
     const data = new Uint8Array(view.buffer, view.byteOffset + this._chunkCursor, count);
     this._chunkCursor += count;
     return data;
   }
 
   async readUint8(): Promise<number> {
-    const view = await this.view(1);
+    const view = await this.fetch(1);
     return view.getUint8(this._chunkCursor++);
   }
 
   async readInt16(): Promise<number> {
-    const view = await this.view(2);
+    const view = await this.fetch(2);
     const data = view.getInt16(this._chunkCursor, true);
     this._chunkCursor += 2;
     return data;
   }
 
   async readUint16(): Promise<number> {
-    const view = await this.view(2);
+    const view = await this.fetch(2);
     const data = view.getUint16(this._chunkCursor, true);
     this._chunkCursor += 2;
     return data;
   }
 
   async readInt32(): Promise<number> {
-    const view = await this.view(4);
+    const view = await this.fetch(4);
     const data = view.getInt32(this._chunkCursor, true);
     this._chunkCursor += 4;
     return data;
   }
 
   async readUint32(): Promise<number> {
-    const view = await this.view(4);
+    const view = await this.fetch(4);
     const data = view.getUint32(this._chunkCursor, true);
     this._chunkCursor += 4;
     return data;
   }
 
   async readFloat32(): Promise<number> {
-    const view = await this.view(4);
+    const view = await this.fetch(4);
     const data = view.getFloat32(this._chunkCursor, true);
     this._chunkCursor += 4;
     return data;
   }
 
   async readFloat64(): Promise<number> {
-    const view = await this.view(8);
+    const view = await this.fetch(8);
     const data = view.getFloat64(this._chunkCursor, true);
     this._chunkCursor += 8;
     return data;
   }
 
   async readInt64(): Promise<bigint> {
-    const view = await this.view(8);
+    const view = await this.fetch(8);
     const data = view.getBigInt64(this._chunkCursor, true);
     this._chunkCursor += 8;
     return data;
   }
 
   async readUint64(): Promise<bigint> {
-    const view = await this.view(8);
+    const view = await this.fetch(8);
     const data = view.getBigUint64(this._chunkCursor, true);
     this._chunkCursor += 8;
     return data;
   }
 
   async readString(length: number): Promise<string> {
-    const view = await this.view(length);
+    const view = await this.fetch(length);
     const data = this._textDecoder.decode(
       view.buffer.slice(
         view.byteOffset + this._chunkCursor,
@@ -151,16 +155,15 @@ export class ChunkedReader {
     return data;
   }
 
-  private async view(bytesRequired: number): Promise<DataView> {
+  private async fetch(bytesRequired: number): Promise<DataView> {
     if (bytesRequired > this.remaining()) {
       throw new Error(
         `Cannot read ${bytesRequired} bytes from ${this.size()} byte source, ${this.remaining()} bytes remaining`,
       );
     }
 
-    const fileRemaining = this.size() - this._fileCursor;
-
     if (!this._chunk || this._chunkCursor === this._chunk.byteLength) {
+      const fileRemaining = this.size() - this._fileCursor;
       this._chunk = await this._file.read(
         this._fileCursor,
         clamp(this.chunkSize, bytesRequired, fileRemaining),
@@ -173,6 +176,7 @@ export class ChunkedReader {
     let bytesAvailable = this._chunk.byteLength - this._chunkCursor;
     const bytesNeeded = bytesRequired - bytesAvailable;
     if (bytesAvailable < bytesRequired) {
+      const fileRemaining = this.size() - this._fileCursor;
       const curChunk = this._chunk;
       const nextChunk = await this._file.read(
         this._fileCursor,

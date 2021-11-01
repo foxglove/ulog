@@ -279,8 +279,12 @@ export class ULog {
     }
 
     const data = dataMsg.data;
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const value = parseMessage(definition, this._header.definitions, view);
+    const value = parseMessage(
+      definition,
+      this._header.definitions,
+      this._reader.view()!,
+      data.byteOffset,
+    );
     const parsed: MessageDataParsed = {
       size: dataMsg.size,
       type: MessageType.Data,

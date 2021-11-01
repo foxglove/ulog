@@ -83,6 +83,7 @@ export function parseFieldValue(
 
 export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): FieldPrimitive {
   const basicType = field.type as BuiltinType;
+  const parser = BASIC_PARSERS[basicType];
 
   if (field.arrayLength != undefined) {
     // String handling
@@ -93,14 +94,14 @@ export function parseBasicFieldValue(field: Field, view: DataView, offset = 0): 
     }
 
     const basicSize = BASIC_SIZES[basicType];
-    const output = new Array<FieldPrimitive>();
+    const output = new Array<FieldPrimitive>(field.arrayLength);
     for (let i = 0; i < field.arrayLength; i++) {
-      output[i] = BASIC_PARSERS[basicType](view, offset + i * basicSize);
+      output[i] = parser(view, offset + i * basicSize);
     }
     return output;
   }
 
-  return BASIC_PARSERS[basicType](view, offset);
+  return parser(view, offset);
 }
 
 export function messageSize(
