@@ -1,3 +1,5 @@
+export * from "./ChunkedReader";
+export * from "./DataReader";
 export * from "./definition";
 export * from "./enums";
 export * from "./file";

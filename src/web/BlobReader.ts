@@ -14,6 +14,10 @@ export class BlobReader implements Filelike {
     this._size = blob.size;
   }
 
+  async open(): Promise<number> {
+    return this._size;
+  }
+
   /**
    * Read `length` bytes starting from `offset` bytes.
    */
@@ -35,8 +39,7 @@ export class BlobReader implements Filelike {
         reader.onerror = null;
         reject(reader.error ?? new Error("Unknown FileReader error"));
       };
-      const readLength = Math.min(length, this._size - offset);
-      reader.readAsArrayBuffer(this._blob.slice(offset, offset + readLength));
+      reader.readAsArrayBuffer(this._blob.slice(offset, offset + length));
     });
   }
 

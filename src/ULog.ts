@@ -60,6 +60,7 @@ export class ULog {
   }
 
   async open(): Promise<void> {
+    await this._reader.open();
     const data = await this._reader.readBytes(8);
     for (let i = 0; i < MAGIC.length; i++) {
       if (data[i] !== MAGIC[i]) {

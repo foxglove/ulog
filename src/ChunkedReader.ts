@@ -17,6 +17,10 @@ export class ChunkedReader {
     this.chunkSize = chunkSize;
   }
 
+  async open(): Promise<number> {
+    return await this._file.open();
+  }
+
   position(): number {
     return this._fileCursor - (this._chunk?.byteLength ?? 0) + this._chunkCursor;
   }
@@ -26,17 +30,26 @@ export class ChunkedReader {
   }
 
   remaining(): number {
-    return this.size() - this._fileCursor;
+    return this.size() - (this._fileCursor - (this._chunk?.byteLength ?? 0) + this._chunkCursor);
   }
 
   seek(relativeByteOffset: number): void {
-    this._fileCursor = this.position() + relativeByteOffset;
+    const byteOffset = this.position() + relativeByteOffset;
+    if (byteOffset < 0 || byteOffset > this.size()) {
+      throw new Error(`Cannot seek to ${byteOffset}`);
+    }
+
+    this._fileCursor = byteOffset;
     this._chunkCursor = 0;
     this._chunk = undefined;
     this._view = undefined;
   }
 
   seekTo(byteOffset: number): void {
+    if (byteOffset < 0 || byteOffset > this.size()) {
+      throw new Error(`Cannot seek to ${byteOffset}`);
+    }
+
     this._fileCursor = byteOffset;
     this._chunkCursor = 0;
     this._chunk = undefined;
@@ -44,6 +57,11 @@ export class ChunkedReader {
   }
 
   async skip(count: number): Promise<void> {
+    const byteOffset = this._chunkCursor + count;
+    if (count < 0 || byteOffset < 0 || byteOffset > this.size()) {
+      throw new Error(`Cannot skip ${count} bytes`);
+    }
+
     await this.view(count);
     this._chunkCursor += count;
   }
@@ -134,10 +152,18 @@ export class ChunkedReader {
   }
 
   private async view(bytesRequired: number): Promise<DataView> {
+    if (bytesRequired > this.remaining()) {
+      throw new Error(
+        `Cannot read ${bytesRequired} bytes from ${this.size()} byte source, ${this.remaining()} bytes remaining`,
+      );
+    }
+
+    const fileRemaining = this.size() - this._fileCursor;
+
     if (!this._chunk || this._chunkCursor === this._chunk.byteLength) {
       this._chunk = await this._file.read(
         this._fileCursor,
-        Math.max(bytesRequired, this.chunkSize),
+        clamp(this.chunkSize, bytesRequired, fileRemaining),
       );
       this._view = new DataView(this._chunk.buffer, this._chunk.byteOffset, this._chunk.byteLength);
       this._chunkCursor = 0;
@@ -150,7 +176,7 @@ export class ChunkedReader {
       const curChunk = this._chunk;
       const nextChunk = await this._file.read(
         this._fileCursor,
-        Math.max(bytesNeeded, this.chunkSize),
+        clamp(this.chunkSize, bytesNeeded, fileRemaining),
       );
       this._chunk = concat(curChunk.slice(this._chunkCursor), nextChunk);
       this._view = new DataView(this._chunk.buffer, this._chunk.byteOffset, this._chunk.byteLength);
@@ -160,9 +186,7 @@ export class ChunkedReader {
       bytesAvailable = this._chunk.byteLength - this._chunkCursor;
 
       if (bytesAvailable < bytesRequired) {
-        throw new Error(
-          `Requested ${bytesRequired} bytes but only ${bytesAvailable} bytes available`,
-        );
+        throw new Error(`Requested ${bytesRequired} bytes but ${bytesAvailable} bytes available`);
       }
     }
 
@@ -175,4 +199,8 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   c.set(a);
   c.set(b, a.byteLength);
   return c;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
