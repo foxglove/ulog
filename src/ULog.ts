@@ -47,8 +47,8 @@ export class ULog {
   private _dataMessageCounts?: Map<number, number>;
   private _logMessageCount?: number;
 
-  constructor(filelike: Filelike) {
-    this._reader = new ChunkedReader(filelike);
+  constructor(filelike: Filelike, opts: { chunkSize?: number } = {}) {
+    this._reader = new ChunkedReader(filelike, opts.chunkSize);
   }
 
   get header(): ULogHeader | undefined {

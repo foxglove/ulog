@@ -7,7 +7,7 @@ async function main() {
     path.join(__dirname, "..", "tests", "log_6_2021-7-20-11-41-56.ulg"),
   );
   for (let i = 0; i < 1; i++) {
-    const ulog = new ULog(reader);
+    const ulog = new ULog(reader, { chunkSize: 1024 * 1024 });
     await ulog.open();
   }
   await reader.close();
