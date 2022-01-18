@@ -5,7 +5,7 @@ import { MessageType } from "./enums";
 import { MessageAddLogged, MessageDataParsed } from "./messages";
 import { FileReader } from "./node/FileReader";
 
-jest.setTimeout(1000 * 20);
+jest.setTimeout(1000 * 30);
 
 describe("ULog sample.ulg", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
@@ -275,6 +275,19 @@ describe("log_6_2021-7-20-11-41-56.ulg", () => {
     const ulog = new ULog(reader);
     await ulog.open();
     expect(ulog.messageCount()).toBe(1023911);
+
+    await reader.close();
+  });
+});
+
+describe("truncated.ulg", () => {
+  const sampleFixture = path.join(__dirname, "..", "tests", "truncated.ulg");
+
+  it("should parse", async () => {
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+    expect(ulog.messageCount()).toBe(187433);
 
     await reader.close();
   });

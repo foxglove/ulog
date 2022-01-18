@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/return-await */
-
 import { ChunkedReader } from "./ChunkedReader";
 import { LogLevel, MessageType, ParameterDefaultFlags } from "./enums";
 import { toHex } from "./hex";
@@ -45,36 +43,40 @@ export async function readRawMessage(
     return undefined;
   }
 
-  const header = await readMessageHeader(reader);
-  switch (header.type) {
-    case MessageType.FlagBits:
-      return readMessageFlagBits(reader, header);
-    case MessageType.Information:
-      return readMessageInformation(reader, header);
-    case MessageType.InformationMulti:
-      return readMessageInformationMulti(reader, header);
-    case MessageType.FormatDefinition:
-      return readMessageFormatDefinition(reader, header);
-    case MessageType.Parameter:
-      return readMessageParameter(reader, header);
-    case MessageType.ParameterDefault:
-      return readMessageParameterDefault(reader, header);
-    case MessageType.AddLogged:
-      return readMessageAddLogged(reader, header);
-    case MessageType.RemoveLogged:
-      return readMessageRemoveLogged(reader, header);
-    case MessageType.Data:
-      return readMessageData(reader, header);
-    case MessageType.Log:
-      return readMessageLog(reader, header);
-    case MessageType.LogTagged:
-      return readMessageLogTagged(reader, header);
-    case MessageType.Synchronization:
-      return readMessageSynchronization(reader, header);
-    case MessageType.Dropout:
-      return readMessageDropout(reader, header);
-    default:
-      return readMessageUnknown(reader, header);
+  try {
+    const header = await readMessageHeader(reader);
+    switch (header.type) {
+      case MessageType.FlagBits:
+        return await readMessageFlagBits(reader, header);
+      case MessageType.Information:
+        return await readMessageInformation(reader, header);
+      case MessageType.InformationMulti:
+        return await readMessageInformationMulti(reader, header);
+      case MessageType.FormatDefinition:
+        return await readMessageFormatDefinition(reader, header);
+      case MessageType.Parameter:
+        return await readMessageParameter(reader, header);
+      case MessageType.ParameterDefault:
+        return await readMessageParameterDefault(reader, header);
+      case MessageType.AddLogged:
+        return await readMessageAddLogged(reader, header);
+      case MessageType.RemoveLogged:
+        return await readMessageRemoveLogged(reader, header);
+      case MessageType.Data:
+        return await readMessageData(reader, header);
+      case MessageType.Log:
+        return await readMessageLog(reader, header);
+      case MessageType.LogTagged:
+        return await readMessageLogTagged(reader, header);
+      case MessageType.Synchronization:
+        return await readMessageSynchronization(reader, header);
+      case MessageType.Dropout:
+        return await readMessageDropout(reader, header);
+      default:
+        return await readMessageUnknown(reader, header);
+    }
+  } catch (err) {
+    return undefined;
   }
 }
 
