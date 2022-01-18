@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/return-await */
-
 import { ChunkedReader } from "./ChunkedReader";
 import { LogLevel, MessageType, ParameterDefaultFlags } from "./enums";
 import { toHex } from "./hex";
