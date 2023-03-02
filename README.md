@@ -40,7 +40,7 @@ void main();
 
 ## License
 
-@foxglove/ulog is licensed under [MIT License](https://opensource.org/licenses/MIT).
+@foxglove/ulog is licensed under the [MIT License](https://opensource.org/licenses/MIT).
 
 ## Releasing
 
