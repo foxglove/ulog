@@ -2,7 +2,7 @@
 
 > _PX4 ULog file reader_
 
-A web and node.js TypeScript library for reading [PX4 ULog](https://docs.px4.io/master/en/dev_log/ulog_file_format.html) files, from the PX4 Autopilot system for drones and other autonomous vehicles.
+A web and node.js TypeScript library for reading [PX4 ULog](https://docs.px4.io/main/en/dev_log/ulog_file_format.html) files, from the PX4 Autopilot system for drones and other autonomous vehicles.
 
 ## Usage
 
@@ -50,4 +50,4 @@ void main();
 
 ## Stay in touch
 
-Join our [Slack channel](https://foxglove.dev/slack) to ask questions, share feedback, and stay up to date on what our team is working on.
+Join our [Discord](https://foxglove.dev/chat) to ask questions, share feedback, and stay up to date on what our team is working on.
