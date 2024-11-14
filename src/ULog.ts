@@ -30,6 +30,8 @@ export type ULogHeader = {
   definitions: Map<string, MessageDefinition>;
 };
 
+export type Subscription = MessageDefinition & Pick<MessageAddLogged, "multiId">;
+
 const MAGIC = [0x55, 0x4c, 0x6f, 0x67, 0x01, 0x12, 0x35];
 
 type IndexEntry = [timestamp: bigint, logPosition: number, messae: DataSectionMessage];
@@ -42,7 +44,7 @@ export class ULog {
   private _dataEnd?: number;
   private _header?: ULogHeader;
   private _appendedOffsets?: [number, number, number];
-  private _subscriptions = new Map<number, MessageDefinition>();
+  private _subscriptions = new Map<number, Subscription>();
   private _timeIndex?: IndexEntry[];
   private _dataMessageCounts?: Map<number, number>;
   private _logMessageCount?: number;
@@ -55,7 +57,7 @@ export class ULog {
     return this._header;
   }
 
-  get subscriptions(): Map<number, MessageDefinition> {
+  get subscriptions(): Map<number, Subscription> {
     return this._subscriptions;
   }
 
@@ -300,7 +302,7 @@ export class ULog {
     if (!definition) {
       throw new Error(`AddLogged unknown message_name: ${subscribe.messageName}`);
     }
-    this._subscriptions.set(subscribe.msgId, definition);
+    this._subscriptions.set(subscribe.msgId, { ...definition, multiId: subscribe.multiId });
   }
 }
 
