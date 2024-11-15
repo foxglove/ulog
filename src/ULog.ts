@@ -223,28 +223,35 @@ export class ULog {
   }
 
   private async createIndex(): Promise<void> {
+    if (!this._header) {
+      throw new Error("Cannot createIndex before reading header");
+    }
+
     const timeIndex: IndexEntry[] = [];
     const dataCounts = new Map<number, number>();
-    let maxTimestamp = 0n;
+    let maxTimestamp: bigint | undefined;
     let logMessageCount = 0;
 
     let i = 0;
     let message: DataSectionMessage | undefined;
     while ((message = await this.readParsedMessage())) {
       if (message.type === MessageType.Data) {
-        if (message.value.timestamp > maxTimestamp) {
+        if (maxTimestamp == undefined || message.value.timestamp > maxTimestamp) {
           maxTimestamp = message.value.timestamp;
         }
         timeIndex.push([message.value.timestamp, i++, message]);
         dataCounts.set(message.msgId, (dataCounts.get(message.msgId) ?? 0) + 1);
       } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
-        if (message.timestamp > maxTimestamp) {
+        if (maxTimestamp == undefined || message.timestamp > maxTimestamp) {
           maxTimestamp = message.timestamp;
         }
         timeIndex.push([message.timestamp, i++, message]);
         logMessageCount++;
       } else {
-        timeIndex.push([maxTimestamp, i++, message]);
+        // Other message types do not have a timestamp field, so we use the current max. timestamp or
+        // alternatively the header timestamp which denotes when the logging started.
+        const timestamp = maxTimestamp ?? this._header.timestamp;
+        timeIndex.push([timestamp, i++, message]);
       }
     }
 
