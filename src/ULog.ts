@@ -48,6 +48,7 @@ export class ULog {
   private _timeIndex?: IndexEntry[];
   private _dataMessageCounts?: Map<number, number>;
   private _logMessageCount?: number;
+  private _dataTimeRange?: [bigint, bigint];
 
   constructor(filelike: Filelike, opts: { chunkSize?: number } = {}) {
     this._reader = new ChunkedReader(filelike, opts.chunkSize);
@@ -214,17 +215,13 @@ export class ULog {
   }
 
   timeRange(): Readonly<[bigint, bigint]> | undefined {
-    if (!this._timeIndex || this._timeIndex.length === 0) {
-      return undefined;
-    }
-    const start = this._timeIndex[0]![0];
-    const end = this._timeIndex[this._timeIndex.length - 1]![0];
-    return [start, end];
+    return this._dataTimeRange;
   }
 
   private async createIndex(): Promise<void> {
     const timeIndex: IndexEntry[] = [];
     const dataCounts = new Map<number, number>();
+    let minTimestamp: bigint | undefined;
     let maxTimestamp = 0n;
     let logMessageCount = 0;
 
@@ -232,12 +229,14 @@ export class ULog {
     let message: DataSectionMessage | undefined;
     while ((message = await this.readParsedMessage())) {
       if (message.type === MessageType.Data) {
+        minTimestamp ??= message.value.timestamp;
         if (message.value.timestamp > maxTimestamp) {
           maxTimestamp = message.value.timestamp;
         }
         timeIndex.push([message.value.timestamp, i++, message]);
         dataCounts.set(message.msgId, (dataCounts.get(message.msgId) ?? 0) + 1);
       } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
+        minTimestamp ??= message.timestamp;
         if (message.timestamp > maxTimestamp) {
           maxTimestamp = message.timestamp;
         }
@@ -251,6 +250,7 @@ export class ULog {
     this._timeIndex = timeIndex.sort(sortTimeIndex);
     this._dataMessageCounts = dataCounts;
     this._logMessageCount = logMessageCount;
+    this._dataTimeRange = minTimestamp ? [minTimestamp, maxTimestamp] : undefined;
   }
 
   private async readParsedMessage(): Promise<DataSectionMessage | undefined> {
