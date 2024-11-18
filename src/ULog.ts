@@ -250,7 +250,7 @@ export class ULog {
     this._timeIndex = timeIndex.sort(sortTimeIndex);
     this._dataMessageCounts = dataCounts;
     this._logMessageCount = logMessageCount;
-    this._dataTimeRange = minTimestamp ? [minTimestamp, maxTimestamp] : undefined;
+    this._dataTimeRange = minTimestamp != undefined ? [minTimestamp, maxTimestamp] : undefined;
   }
 
   private async readParsedMessage(): Promise<DataSectionMessage | undefined> {
