@@ -106,5 +106,10 @@ dist
 # MacOS
 .DS_Store
 
-# Yarn
+# Yarn & packaging
+.pnp.*
 .yarn
+!.yarn/patches
+!.yarn/plugins
+!.yarn/sdks
+*.tgz
