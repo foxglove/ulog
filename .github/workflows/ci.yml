@@ -12,6 +12,10 @@ jobs:
     name: push
     runs-on: ubuntu-latest
 
+    permissions:
+      # https://docs.npmjs.com/generating-provenance-statements#publishing-packages-with-provenance-via-github-actions
+      id-token: write
+
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -19,16 +23,18 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.1.0
         with:
-          node-version: 20
+          node-version: 22.x
           cache: yarn
 
-      - run: yarn install --frozen-lockfile
+      - run: yarn install --immutable
       - run: yarn run build
       - run: yarn run lint:ci
       - run: yarn run test
 
+      - run: yarn pack
       - name: Publish to NPM
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: yarn publish --access public
+        # `yarn npm publish` does not currently support --provenance: https://github.com/yarnpkg/berry/issues/5430
+        run: npm publish package.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
