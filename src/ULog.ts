@@ -229,14 +229,18 @@ export class ULog {
     let message: DataSectionMessage | undefined;
     while ((message = await this.readParsedMessage())) {
       if (message.type === MessageType.Data) {
-        minTimestamp ??= message.value.timestamp;
+        if (minTimestamp == undefined || message.value.timestamp < minTimestamp) {
+          minTimestamp = message.value.timestamp;
+        }
         if (message.value.timestamp > maxTimestamp) {
           maxTimestamp = message.value.timestamp;
         }
         timeIndex.push([message.value.timestamp, i++, message]);
         dataCounts.set(message.msgId, (dataCounts.get(message.msgId) ?? 0) + 1);
       } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
-        minTimestamp ??= message.timestamp;
+        if (minTimestamp == undefined || message.timestamp < minTimestamp) {
+          minTimestamp = message.timestamp;
+        }
         if (message.timestamp > maxTimestamp) {
           maxTimestamp = message.timestamp;
         }

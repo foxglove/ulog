@@ -301,7 +301,7 @@ describe("README.md", () => {
     const ulog = new ULog(reader);
     await ulog.open(); // required before any other operations
     expect(ulog.messageCount()).toBe(64599); // ex: 64599
-    expect(ulog.timeRange()).toEqual([112574307n, 181493506n]);
+    expect(ulog.timeRange()).toEqual([0n, 181493506n]); // ex: [ 0n, 181493506n ]
 
     const msgIdCounts = new Map<number, number>();
     for await (const msg of ulog.readMessages()) {
