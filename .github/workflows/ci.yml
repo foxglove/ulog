@@ -21,6 +21,7 @@ jobs:
           node-version: 16.x
           registry-url: https://registry.npmjs.org
 
+      - run: corepack enable
       - run: yarn install --frozen-lockfile
       - run: yarn run build
       - run: yarn run lint:ci
