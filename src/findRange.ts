@@ -1,5 +1,5 @@
 export function findRange(
-  entries: [timestamp: bigint, _: number][],
+  entries: [timestamp: bigint, _: unknown, _: unknown][],
   minValue: bigint,
   maxValue: bigint,
 ): [number, number] | undefined {

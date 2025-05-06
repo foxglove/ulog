@@ -34,10 +34,11 @@ export type Subscription = MessageDefinition & Pick<MessageAddLogged, "multiId">
 
 const MAGIC = [0x55, 0x4c, 0x6f, 0x67, 0x01, 0x12, 0x35];
 
-type IndexEntry = [timestamp: bigint, offset: number];
+type IndexEntry = [timestamp: bigint, offset: number, msgId: number | undefined];
 
 export class ULog {
-  #reader: ChunkedReader;
+  #fileLike: Filelike;
+  #chunkSize: number | undefined;
 
   // These members are only populated after open()
   #dataEnd?: number;
@@ -50,7 +51,8 @@ export class ULog {
   #dataTimeRange?: [bigint, bigint];
 
   constructor(filelike: Filelike, opts: { chunkSize?: number } = {}) {
-    this.#reader = new ChunkedReader(filelike, opts.chunkSize);
+    this.#fileLike = filelike;
+    this.#chunkSize = opts.chunkSize;
   }
 
   get header(): ULogHeader | undefined {
@@ -62,8 +64,9 @@ export class ULog {
   }
 
   async open(): Promise<void> {
-    await this.#reader.open();
-    const data = await this.#reader.readBytes(8);
+    await this.#fileLike.open();
+    const reader = new ChunkedReader(this.#fileLike, this.#chunkSize);
+    const data = await reader.readBytes(8);
     for (let i = 0; i < MAGIC.length; i++) {
       if (data[i] !== MAGIC[i]) {
         throw new Error(`Invalid ULog header: ${toHex(data)}`);
@@ -71,14 +74,14 @@ export class ULog {
     }
 
     const version = data[7]!;
-    const timestamp = await this.#reader.readUint64();
+    const timestamp = await reader.readUint64();
     const information = new Map<string, FieldPrimitive | FieldPrimitive[]>();
     const parameters = new Map<string, ParameterEntry>();
     const definitions = new Map<string, MessageDefinition>();
 
     let flagBits: MessageFlagBits | undefined;
-    while (!(await isDataSectionStart(this.#reader))) {
-      const message = await readRawMessage(this.#reader, this.#dataEnd);
+    while (!(await isDataSectionStart(reader))) {
+      const message = await readRawMessage(reader, this.#dataEnd);
       if (!message) {
         break;
       }
@@ -169,42 +172,68 @@ export class ULog {
     this.#appendedOffsets = appendedOffsets.map((n) => Number(n)) as [number, number, number];
     const firstOffset = this.#appendedOffsets[0];
 
-    this.#dataEnd = this.#reader.size();
+    this.#dataEnd = reader.size();
     if (firstOffset > 0 && firstOffset < this.#dataEnd) {
       this.#dataEnd = firstOffset;
     }
 
     this.#header = { version, timestamp, flagBits, information, parameters, definitions };
 
-    await this.#createIndex();
+    await this.#createIndex(reader);
   }
 
   async *readMessages(
-    opts: { startTime?: bigint; endTime?: bigint } = {},
+    opts: {
+      startTime?: bigint;
+      endTime?: bigint;
+      includeLogs?: boolean;
+      msgIds?: Set<number>;
+    } = {},
   ): AsyncIterableIterator<DataSectionMessage> {
-    const sortedMessages = this.#timeIndex;
-    if (sortedMessages == undefined) {
+    const includeLogs = opts.includeLogs ?? false;
+    const msgIds = opts.msgIds;
+
+    const reader = new ChunkedReader(this.#fileLike, this.#chunkSize);
+
+    const timeIndex = this.#timeIndex;
+    if (timeIndex == undefined) {
       throw new Error(`Cannot readMessages before createIndex`);
     }
 
-    if (sortedMessages.length === 0) {
+    if (timeIndex.length === 0) {
       return;
     }
 
-    const startTime = opts.startTime ?? sortedMessages[0]![0];
-    const endTime = opts.endTime ?? sortedMessages[sortedMessages.length - 1]![0];
+    const startTime = opts.startTime ?? timeIndex[0]![0];
+    const endTime = opts.endTime ?? timeIndex[timeIndex.length - 1]![0];
 
-    const range = findRange(sortedMessages, startTime, endTime);
+    const range = findRange(timeIndex, startTime, endTime);
     if (range == undefined) {
       return;
     }
 
     for (let i = range[0]; i <= range[1]; i++) {
-      const messageRecordLocator = sortedMessages[i]!;
+      const indexEntry = timeIndex[i]!;
 
-      // read and yield the locator
-      this.#reader.seekTo(messageRecordLocator[1]);
-      const msg = await this.#readParsedMessage();
+      // if message is a log message and includeLogs is true, then yield it
+      if (includeLogs) {
+        reader.seekTo(indexEntry[1]);
+        const msg = await this.#readParsedMessage(reader);
+        if (msg) {
+          yield msg;
+        }
+      }
+
+      // If there are message ids specified, then only yield if the locator msgId matches
+      if (msgIds != undefined) {
+        const msgId = indexEntry[2];
+        if (msgId == undefined || !msgIds.has(msgId)) {
+          continue;
+        }
+      }
+
+      reader.seekTo(indexEntry[1]);
+      const msg = await this.#readParsedMessage(reader);
       if (msg) {
         yield msg;
       }
@@ -227,7 +256,7 @@ export class ULog {
     return this.#dataTimeRange;
   }
 
-  async #createIndex(): Promise<void> {
+  async #createIndex(reader: ChunkedReader): Promise<void> {
     if (!this.#header) {
       throw new Error(`Cannot read before open`);
     }
@@ -239,9 +268,9 @@ export class ULog {
     let logMessageCount = 0;
 
     for (;;) {
-      const offset = this.#reader.position();
+      const offset = reader.position();
 
-      const rawMessage = await readRawMessage(this.#reader, this.#dataEnd);
+      const rawMessage = await readRawMessage(reader, this.#dataEnd);
       if (!rawMessage) {
         break;
       }
@@ -257,7 +286,8 @@ export class ULog {
         if (rawMessage.timestamp > maxTimestamp) {
           maxTimestamp = rawMessage.timestamp;
         }
-        timeIndex.push([rawMessage.timestamp, offset]);
+
+        timeIndex.push([rawMessage.timestamp, offset, undefined]);
         logMessageCount++;
         continue;
       }
@@ -266,7 +296,7 @@ export class ULog {
         const dataMsg = rawMessage;
         const definition = this.#subscriptions.get(dataMsg.msgId);
         if (!definition) {
-          const msgPos = this.#reader.position() - rawMessage.size - 3;
+          const msgPos = reader.position() - rawMessage.size - 3;
           throw new Error(
             `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
           );
@@ -276,7 +306,7 @@ export class ULog {
         const timestamp = parseTimestamp(
           definition,
           this.#header.definitions,
-          this.#reader.view()!,
+          reader.view()!,
           data.byteOffset,
         );
 
@@ -287,12 +317,12 @@ export class ULog {
           maxTimestamp = timestamp;
         }
 
-        timeIndex.push([timestamp, offset]);
+        timeIndex.push([timestamp, offset, dataMsg.msgId]);
         dataCounts.set(dataMsg.msgId, (dataCounts.get(dataMsg.msgId) ?? 0) + 1);
         continue;
       }
 
-      timeIndex.push([maxTimestamp, offset]);
+      timeIndex.push([maxTimestamp, offset, undefined]);
     }
 
     this.#timeIndex = timeIndex.sort(sortTimeIndex);
@@ -301,12 +331,12 @@ export class ULog {
     this.#dataTimeRange = minTimestamp != undefined ? [minTimestamp, maxTimestamp] : undefined;
   }
 
-  async #readParsedMessage(): Promise<DataSectionMessage | undefined> {
+  async #readParsedMessage(reader: ChunkedReader): Promise<DataSectionMessage | undefined> {
     if (!this.#header) {
       throw new Error(`Cannot read before open`);
     }
 
-    const rawMessage = await readRawMessage(this.#reader, this.#dataEnd);
+    const rawMessage = await readRawMessage(reader, this.#dataEnd);
     if (!rawMessage) {
       return undefined;
     }
@@ -322,7 +352,7 @@ export class ULog {
     const dataMsg = rawMessage;
     const definition = this.#subscriptions.get(dataMsg.msgId);
     if (!definition) {
-      const msgPos = this.#reader.position() - rawMessage.size - 3;
+      const msgPos = reader.position() - rawMessage.size - 3;
       throw new Error(
         `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
       );
@@ -332,7 +362,7 @@ export class ULog {
     const value = parseMessage(
       definition,
       this.#header.definitions,
-      this.#reader.view()!,
+      reader.view()!,
       data.byteOffset,
     );
     const parsed: MessageDataParsed = {

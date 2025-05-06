@@ -22,10 +22,6 @@ export class ChunkedReader {
     this.chunkSize = chunkSize;
   }
 
-  async open(): Promise<number> {
-    return await this.#file.open();
-  }
-
   view(): DataView | undefined {
     return this.#view;
   }

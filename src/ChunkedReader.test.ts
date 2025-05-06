@@ -4,17 +4,10 @@ import { ChunkedReader } from "./ChunkedReader";
 describe("ChunkedReader", () => {
   const sampleFixture = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
 
-  // open
-  it("should open a Filelike", async () => {
-    const reader = new ChunkedReader(new DataReader(sampleFixture));
-    expect(await reader.open()).toBe(sampleFixture.byteLength);
-  });
-
   // view
   it("should return a view of the data", async () => {
     const reader = new ChunkedReader(new DataReader(sampleFixture), 3);
     expect(reader.view()).toBeUndefined();
-    await reader.open();
     expect(reader.view()).toBeUndefined();
     await reader.peekUint8(0);
     expect(reader.view()?.buffer.byteLength).toBe(sampleFixture.byteLength);
