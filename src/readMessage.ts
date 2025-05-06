@@ -45,7 +45,7 @@ export async function readRawMessage(
 
   try {
     const header = await readMessageHeader(reader);
-    switch (header.type) {
+    switch (header.type as MessageType) {
       case MessageType.FlagBits:
         return await readMessageFlagBits(reader, header);
       case MessageType.Information:
@@ -72,10 +72,12 @@ export async function readRawMessage(
         return await readMessageSynchronization(reader, header);
       case MessageType.Dropout:
         return await readMessageDropout(reader, header);
+      case MessageType.Unknown:
       default:
         return await readMessageUnknown(reader, header);
     }
-  } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_err) {
     return undefined;
   }
 }

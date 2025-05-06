@@ -1,6 +1,8 @@
+const path = require("path");
+
 const { ULog } = require("../dist");
 const { FileReader } = require("../dist/node");
-const path = require("path");
+
 const performance = require("perf_hooks").performance;
 
 function formatBytes(totalBytes) {

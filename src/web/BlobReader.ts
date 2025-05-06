@@ -2,20 +2,20 @@ import { Filelike } from "../file";
 
 // browser reader for Blob|File objects
 export class BlobReader implements Filelike {
-  private _blob: Blob;
-  private _size: number;
+  #blob: Blob;
+  #size: number;
 
   constructor(blob: Blob | File) {
     if (!(blob instanceof Blob)) {
       throw new Error("Expected file to be a File or Blob.");
     }
 
-    this._blob = blob;
-    this._size = blob.size;
+    this.#blob = blob;
+    this.#size = blob.size;
   }
 
   async open(): Promise<number> {
-    return this._size;
+    return this.#size;
   }
 
   /**
@@ -29,7 +29,8 @@ export class BlobReader implements Filelike {
         reader.onerror = null;
 
         if (reader.result == undefined || !(reader.result instanceof ArrayBuffer)) {
-          return reject("Unsupported format for BlobReader");
+          reject(new Error("Unsupported format for BlobReader"));
+          return;
         }
 
         resolve(new Uint8Array(reader.result));
@@ -39,11 +40,11 @@ export class BlobReader implements Filelike {
         reader.onerror = null;
         reject(reader.error ?? new Error("Unknown FileReader error"));
       };
-      reader.readAsArrayBuffer(this._blob.slice(offset, offset + length));
+      reader.readAsArrayBuffer(this.#blob.slice(offset, offset + length));
     });
   }
 
   size(): number {
-    return this._size;
+    return this.#size;
   }
 }
