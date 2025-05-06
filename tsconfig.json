@@ -2,8 +2,8 @@
   "include": ["./src/**/*", "./*.d.ts"],
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es2020",
-    "lib": ["dom", "es2020"],
+    "target": "es2022",
+    "lib": ["dom", "es2022"],
     "rootDir": "./src",
     "outDir": "./dist",
 

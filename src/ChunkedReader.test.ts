@@ -33,11 +33,15 @@ describe("ChunkedReader", () => {
 
       reader.seek(-2);
       expect(reader.position()).toBe(1);
-      expect(() => reader.seek(-2)).toThrow();
+      expect(() => {
+        reader.seek(-2);
+      }).toThrow();
 
       reader.seek(7);
       expect(reader.position()).toBe(8);
-      expect(() => reader.seek(1)).toThrow();
+      expect(() => {
+        reader.seek(1);
+      }).toThrow();
     }
   });
 
@@ -76,10 +80,14 @@ describe("ChunkedReader", () => {
       expect(reader.position()).toBe(3);
       reader.seek(-2);
       expect(reader.position()).toBe(1);
-      expect(() => reader.seek(-2)).toThrow();
+      expect(() => {
+        reader.seek(-2);
+      }).toThrow();
       reader.seek(7);
       expect(reader.position()).toBe(8);
-      expect(() => reader.seek(1)).toThrow();
+      expect(() => {
+        reader.seek(1);
+      }).toThrow();
     }
   });
 
@@ -89,14 +97,18 @@ describe("ChunkedReader", () => {
       const reader = new ChunkedReader(new DataReader(sampleFixture), i);
       reader.seekTo(3);
       expect(reader.position()).toBe(3);
-      expect(() => reader.seekTo(-2)).toThrow();
+      expect(() => {
+        reader.seekTo(-2);
+      }).toThrow();
       reader.seekTo(6);
       expect(reader.position()).toBe(6);
       reader.seekTo(0);
       expect(reader.position()).toBe(0);
       reader.seekTo(8);
       expect(reader.position()).toBe(8);
-      expect(() => reader.seekTo(9)).toThrow();
+      expect(() => {
+        reader.seekTo(9);
+      }).toThrow();
       expect(reader.remaining()).toBe(0);
     }
   });

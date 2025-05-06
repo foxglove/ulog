@@ -37,34 +37,33 @@ const MAGIC = [0x55, 0x4c, 0x6f, 0x67, 0x01, 0x12, 0x35];
 type IndexEntry = [timestamp: bigint, logPosition: number, messae: DataSectionMessage];
 
 export class ULog {
-  private _reader: ChunkedReader;
+  #reader: ChunkedReader;
 
   // These members are only populated after open()
-  private _dataStart?: number;
-  private _dataEnd?: number;
-  private _header?: ULogHeader;
-  private _appendedOffsets?: [number, number, number];
-  private _subscriptions = new Map<number, Subscription>();
-  private _timeIndex?: IndexEntry[];
-  private _dataMessageCounts?: Map<number, number>;
-  private _logMessageCount?: number;
-  private _dataTimeRange?: [bigint, bigint];
+  #dataEnd?: number;
+  #header?: ULogHeader;
+  #appendedOffsets?: [number, number, number];
+  #subscriptions = new Map<number, Subscription>();
+  #timeIndex?: IndexEntry[];
+  #dataMessageCounts?: Map<number, number>;
+  #logMessageCount?: number;
+  #dataTimeRange?: [bigint, bigint];
 
   constructor(filelike: Filelike, opts: { chunkSize?: number } = {}) {
-    this._reader = new ChunkedReader(filelike, opts.chunkSize);
+    this.#reader = new ChunkedReader(filelike, opts.chunkSize);
   }
 
   get header(): ULogHeader | undefined {
-    return this._header;
+    return this.#header;
   }
 
   get subscriptions(): Map<number, Subscription> {
-    return this._subscriptions;
+    return this.#subscriptions;
   }
 
   async open(): Promise<void> {
-    await this._reader.open();
-    const data = await this._reader.readBytes(8);
+    await this.#reader.open();
+    const data = await this.#reader.readBytes(8);
     for (let i = 0; i < MAGIC.length; i++) {
       if (data[i] !== MAGIC[i]) {
         throw new Error(`Invalid ULog header: ${toHex(data)}`);
@@ -72,14 +71,14 @@ export class ULog {
     }
 
     const version = data[7]!;
-    const timestamp = await this._reader.readUint64();
+    const timestamp = await this.#reader.readUint64();
     const information = new Map<string, FieldPrimitive | FieldPrimitive[]>();
     const parameters = new Map<string, ParameterEntry>();
     const definitions = new Map<string, MessageDefinition>();
 
     let flagBits: MessageFlagBits | undefined;
-    while (!(await isDataSectionStart(this._reader))) {
-      const message = await readRawMessage(this._reader, this._dataEnd);
+    while (!(await isDataSectionStart(this.#reader))) {
+      const message = await readRawMessage(this.#reader, this.#dataEnd);
       if (!message) {
         break;
       }
@@ -151,6 +150,14 @@ export class ULog {
           }
           break;
         }
+        case MessageType.Unknown:
+        case MessageType.AddLogged:
+        case MessageType.RemoveLogged:
+        case MessageType.Data:
+        case MessageType.Log:
+        case MessageType.LogTagged:
+        case MessageType.Synchronization:
+        case MessageType.Dropout:
         default:
           throw new Error(`Unrecognized message type ${message.type}`);
       }
@@ -159,28 +166,23 @@ export class ULog {
     // File offsets are stored as 64-bit unsigned integers, but we cast to Number here which safely
     // stores up to 53-bit integers. This supports ulogs up to 8192 TB in length
     const appendedOffsets = flagBits?.appendedOffsets ?? [0n, 0n, 0n];
-    this._appendedOffsets = appendedOffsets.map((n) => Number(n)) as [number, number, number];
-    const firstOffset = this._appendedOffsets[0];
+    this.#appendedOffsets = appendedOffsets.map((n) => Number(n)) as [number, number, number];
+    const firstOffset = this.#appendedOffsets[0];
 
-    this._dataStart = this._reader.position();
-    this._dataEnd = this._reader.size();
-    if (firstOffset > 0 && firstOffset < this._dataEnd) {
-      this._dataEnd = firstOffset;
+    this.#dataEnd = this.#reader.size();
+    if (firstOffset > 0 && firstOffset < this.#dataEnd) {
+      this.#dataEnd = firstOffset;
     }
 
-    this._header = { version, timestamp, flagBits, information, parameters, definitions };
+    this.#header = { version, timestamp, flagBits, information, parameters, definitions };
 
-    if (this._dataStart == undefined || this._dataEnd == undefined) {
-      throw new Error(`Cannot create index before open`);
-    }
-
-    await this.createIndex();
+    await this.#createIndex();
   }
 
   async *readMessages(
     opts: { startTime?: bigint; endTime?: bigint } = {},
   ): AsyncIterableIterator<DataSectionMessage> {
-    const sortedMessages = this._timeIndex;
+    const sortedMessages = this.#timeIndex;
     if (sortedMessages == undefined) {
       throw new Error(`Cannot readMessages before createIndex`);
     }
@@ -203,22 +205,22 @@ export class ULog {
   }
 
   messageCount(): number | undefined {
-    return this._timeIndex?.length;
+    return this.#timeIndex?.length;
   }
 
   dataMessageCounts(): ReadonlyMap<number, number> | undefined {
-    return this._dataMessageCounts;
+    return this.#dataMessageCounts;
   }
 
   logCount(): number | undefined {
-    return this._logMessageCount;
+    return this.#logMessageCount;
   }
 
   timeRange(): Readonly<[bigint, bigint]> | undefined {
-    return this._dataTimeRange;
+    return this.#dataTimeRange;
   }
 
-  private async createIndex(): Promise<void> {
+  async #createIndex(): Promise<void> {
     const timeIndex: IndexEntry[] = [];
     const dataCounts = new Map<number, number>();
     let minTimestamp: bigint | undefined;
@@ -227,7 +229,7 @@ export class ULog {
 
     let i = 0;
     let message: DataSectionMessage | undefined;
-    while ((message = await this.readParsedMessage())) {
+    while ((message = await this.#readParsedMessage())) {
       if (message.type === MessageType.Data) {
         if (minTimestamp == undefined || message.value.timestamp < minTimestamp) {
           minTimestamp = message.value.timestamp;
@@ -251,24 +253,24 @@ export class ULog {
       }
     }
 
-    this._timeIndex = timeIndex.sort(sortTimeIndex);
-    this._dataMessageCounts = dataCounts;
-    this._logMessageCount = logMessageCount;
-    this._dataTimeRange = minTimestamp != undefined ? [minTimestamp, maxTimestamp] : undefined;
+    this.#timeIndex = timeIndex.sort(sortTimeIndex);
+    this.#dataMessageCounts = dataCounts;
+    this.#logMessageCount = logMessageCount;
+    this.#dataTimeRange = minTimestamp != undefined ? [minTimestamp, maxTimestamp] : undefined;
   }
 
-  private async readParsedMessage(): Promise<DataSectionMessage | undefined> {
-    if (!this._header) {
+  async #readParsedMessage(): Promise<DataSectionMessage | undefined> {
+    if (!this.#header) {
       throw new Error(`Cannot read before open`);
     }
 
-    const rawMessage = await readRawMessage(this._reader, this._dataEnd);
+    const rawMessage = await readRawMessage(this.#reader, this.#dataEnd);
     if (!rawMessage) {
       return undefined;
     }
 
     if (rawMessage.type === MessageType.AddLogged) {
-      this.handleSubscription(rawMessage);
+      this.#handleSubscription(rawMessage);
     }
 
     if (rawMessage.type !== MessageType.Data) {
@@ -276,9 +278,9 @@ export class ULog {
     }
 
     const dataMsg = rawMessage;
-    const definition = this._subscriptions.get(dataMsg.msgId);
+    const definition = this.#subscriptions.get(dataMsg.msgId);
     if (!definition) {
-      const msgPos = this._reader.position() - rawMessage.size - 3;
+      const msgPos = this.#reader.position() - rawMessage.size - 3;
       throw new Error(
         `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
       );
@@ -287,8 +289,8 @@ export class ULog {
     const data = dataMsg.data;
     const value = parseMessage(
       definition,
-      this._header.definitions,
-      this._reader.view()!,
+      this.#header.definitions,
+      this.#reader.view()!,
       data.byteOffset,
     );
     const parsed: MessageDataParsed = {
@@ -301,17 +303,17 @@ export class ULog {
     return parsed;
   }
 
-  private handleSubscription(subscribe: MessageAddLogged): void {
-    const definition = this._header?.definitions.get(subscribe.messageName);
+  #handleSubscription(subscribe: MessageAddLogged): void {
+    const definition = this.#header?.definitions.get(subscribe.messageName);
     if (!definition) {
       throw new Error(`AddLogged unknown message_name: ${subscribe.messageName}`);
     }
-    this._subscriptions.set(subscribe.msgId, { ...definition, multiId: subscribe.multiId });
+    this.#subscriptions.set(subscribe.msgId, { ...definition, multiId: subscribe.multiId });
   }
 }
 
 async function isDataSectionStart(reader: ChunkedReader): Promise<boolean> {
-  const type = await reader.peekUint8(2);
+  const type = (await reader.peekUint8(2)) as MessageType;
   switch (type) {
     case MessageType.AddLogged:
     case MessageType.RemoveLogged:
@@ -321,7 +323,13 @@ async function isDataSectionStart(reader: ChunkedReader): Promise<boolean> {
     case MessageType.Synchronization:
     case MessageType.Dropout:
       return true;
-    default:
+    case MessageType.Unknown:
+    case MessageType.FlagBits:
+    case MessageType.Information:
+    case MessageType.InformationMulti:
+    case MessageType.FormatDefinition:
+    case MessageType.Parameter:
+    case MessageType.ParameterDefault:
       return false;
   }
 }

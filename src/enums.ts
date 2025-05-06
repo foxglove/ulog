@@ -24,7 +24,9 @@ export enum IncompatibleFlags {
 }
 
 export enum ParameterDefaultFlags {
+  // eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
   SystemWide = 1 << 0,
+  // eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
   CurrentConfigurationDefault = 1 << 1,
 }
 

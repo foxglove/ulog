@@ -1,7 +1,7 @@
 // -*- jsonc -*-
 {
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
@@ -12,8 +12,5 @@
     ".yarn/**": true,
     "yarn.lock": true
   },
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "eslint.options": {
-    "reportUnusedDisableDirectives": true
-  }
+  "typescript.tsdk": "node_modules/typescript/lib"
 }
