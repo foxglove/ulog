@@ -34,7 +34,7 @@ export type Subscription = MessageDefinition & Pick<MessageAddLogged, "multiId">
 
 const MAGIC = [0x55, 0x4c, 0x6f, 0x67, 0x01, 0x12, 0x35];
 
-type IndexEntry = [timestamp: bigint, logPosition: number, messae: DataSectionMessage];
+type IndexEntry = [timestamp: bigint, offset: number];
 
 export class ULog {
   #reader: ChunkedReader;
@@ -200,7 +200,14 @@ export class ULog {
     }
 
     for (let i = range[0]; i <= range[1]; i++) {
-      yield sortedMessages[i]![2];
+      const messageRecordLocator = sortedMessages[i]!;
+
+      // read and yield the locator
+      this.#reader.seekTo(messageRecordLocator[1]);
+      const msg = await this.#readParsedMessage();
+      if (msg) {
+        yield msg;
+      }
     }
   }
 
@@ -227,9 +234,14 @@ export class ULog {
     let maxTimestamp = 0n;
     let logMessageCount = 0;
 
-    let i = 0;
-    let message: DataSectionMessage | undefined;
-    while ((message = await this.#readParsedMessage())) {
+    for (;;) {
+      const offset = this.#reader.position();
+
+      const message = await this.#readParsedMessage();
+      if (message == undefined) {
+        break;
+      }
+
       if (message.type === MessageType.Data) {
         if (minTimestamp == undefined || message.value.timestamp < minTimestamp) {
           minTimestamp = message.value.timestamp;
@@ -237,7 +249,7 @@ export class ULog {
         if (message.value.timestamp > maxTimestamp) {
           maxTimestamp = message.value.timestamp;
         }
-        timeIndex.push([message.value.timestamp, i++, message]);
+        timeIndex.push([message.value.timestamp, offset]);
         dataCounts.set(message.msgId, (dataCounts.get(message.msgId) ?? 0) + 1);
       } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
         if (minTimestamp == undefined || message.timestamp < minTimestamp) {
@@ -246,10 +258,10 @@ export class ULog {
         if (message.timestamp > maxTimestamp) {
           maxTimestamp = message.timestamp;
         }
-        timeIndex.push([message.timestamp, i++, message]);
+        timeIndex.push([message.timestamp, offset]);
         logMessageCount++;
       } else {
-        timeIndex.push([maxTimestamp, i++, message]);
+        timeIndex.push([maxTimestamp, offset]);
       }
     }
 
@@ -347,10 +359,13 @@ function isValidParameter(field: Field | undefined): field is Field {
 function sortTimeIndex(a: IndexEntry, b: IndexEntry) {
   const timestampA = a[0];
   const timestampB = b[0];
+
+  // If the timestamps are the same, sort by the offset within the file
   if (timestampA === timestampB) {
     const indexA = a[1];
     const indexB = b[1];
     return indexA - indexB;
   }
+
   return Number(timestampA - timestampB);
 }
