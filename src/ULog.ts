@@ -16,7 +16,7 @@ import {
   FieldPrimitive,
   MessageDataParsed,
 } from "./messages";
-import { parseBasicFieldValue, parseMessage } from "./parse";
+import { parseBasicFieldValue, parseMessage, parseTimestamp } from "./parse";
 import { readRawMessage } from "./readMessage";
 
 export type ParameterEntry = { value: number; defaultTypes: number };
@@ -228,6 +228,10 @@ export class ULog {
   }
 
   async #createIndex(): Promise<void> {
+    if (!this.#header) {
+      throw new Error(`Cannot read before open`);
+    }
+
     const timeIndex: IndexEntry[] = [];
     const dataCounts = new Map<number, number>();
     let minTimestamp: bigint | undefined;
@@ -237,32 +241,58 @@ export class ULog {
     for (;;) {
       const offset = this.#reader.position();
 
-      const message = await this.#readParsedMessage();
-      if (message == undefined) {
+      const rawMessage = await readRawMessage(this.#reader, this.#dataEnd);
+      if (!rawMessage) {
         break;
       }
 
-      if (message.type === MessageType.Data) {
-        if (minTimestamp == undefined || message.value.timestamp < minTimestamp) {
-          minTimestamp = message.value.timestamp;
-        }
-        if (message.value.timestamp > maxTimestamp) {
-          maxTimestamp = message.value.timestamp;
-        }
-        timeIndex.push([message.value.timestamp, offset]);
-        dataCounts.set(message.msgId, (dataCounts.get(message.msgId) ?? 0) + 1);
-      } else if (message.type === MessageType.Log || message.type === MessageType.LogTagged) {
-        if (minTimestamp == undefined || message.timestamp < minTimestamp) {
-          minTimestamp = message.timestamp;
-        }
-        if (message.timestamp > maxTimestamp) {
-          maxTimestamp = message.timestamp;
-        }
-        timeIndex.push([message.timestamp, offset]);
-        logMessageCount++;
-      } else {
-        timeIndex.push([maxTimestamp, offset]);
+      if (rawMessage.type === MessageType.AddLogged) {
+        this.#handleSubscription(rawMessage);
       }
+
+      if (rawMessage.type === MessageType.Log || rawMessage.type === MessageType.LogTagged) {
+        if (minTimestamp == undefined || rawMessage.timestamp < minTimestamp) {
+          minTimestamp = rawMessage.timestamp;
+        }
+        if (rawMessage.timestamp > maxTimestamp) {
+          maxTimestamp = rawMessage.timestamp;
+        }
+        timeIndex.push([rawMessage.timestamp, offset]);
+        logMessageCount++;
+        continue;
+      }
+
+      if (rawMessage.type === MessageType.Data) {
+        const dataMsg = rawMessage;
+        const definition = this.#subscriptions.get(dataMsg.msgId);
+        if (!definition) {
+          const msgPos = this.#reader.position() - rawMessage.size - 3;
+          throw new Error(
+            `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
+          );
+        }
+
+        const data = dataMsg.data;
+        const timestamp = parseTimestamp(
+          definition,
+          this.#header.definitions,
+          this.#reader.view()!,
+          data.byteOffset,
+        );
+
+        if (minTimestamp == undefined || timestamp < minTimestamp) {
+          minTimestamp = timestamp;
+        }
+        if (timestamp > maxTimestamp) {
+          maxTimestamp = timestamp;
+        }
+
+        timeIndex.push([timestamp, offset]);
+        dataCounts.set(dataMsg.msgId, (dataCounts.get(dataMsg.msgId) ?? 0) + 1);
+        continue;
+      }
+
+      timeIndex.push([maxTimestamp, offset]);
     }
 
     this.#timeIndex = timeIndex.sort(sortTimeIndex);

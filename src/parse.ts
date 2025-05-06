@@ -55,6 +55,39 @@ export function parseMessage(
   return output as ParsedMessage;
 }
 
+export function parseTimestamp(
+  definition: MessageDefinition,
+  definitions: Map<string, MessageDefinition>,
+  view: DataView,
+  offset = 0,
+): bigint {
+  let timestamp: bigint | undefined;
+
+  let curOffset = offset;
+  for (const field of definition.fields) {
+    if (field.name.startsWith("_")) {
+      continue;
+    }
+    if (field.name === "timestamp") {
+      const value = parseFieldValue(field, definitions, view, curOffset);
+      if (typeof value !== "bigint") {
+        throw new Error(
+          `Message "${definition.name}" has a timestamp field with a non-integer value`,
+        );
+      }
+      timestamp = value;
+      break;
+    }
+    curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
+  }
+
+  if (timestamp == undefined) {
+    throw new Error(`Message "${definition.name}" is missing a timestamp field`);
+  }
+
+  return timestamp;
+}
+
 export function parseFieldValue(
   field: Field,
   definitions: Map<string, MessageDefinition>,
