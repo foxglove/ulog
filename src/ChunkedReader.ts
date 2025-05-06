@@ -8,8 +8,13 @@ export class ChunkedReader {
   #file: Filelike;
   #chunk?: Uint8Array;
   #view?: DataView;
+
+  /** Position in the file where we read the next chunk */
   #fileCursor = 0;
+
+  /** Position in the current chunk */
   #chunkCursor = 0;
+
   #textDecoder = new TextDecoder();
 
   constructor(filelike: Filelike, chunkSize = CHUNK_SIZE) {
@@ -52,6 +57,17 @@ export class ChunkedReader {
   seekTo(byteOffset: number): void {
     if (byteOffset < 0 || byteOffset > this.size()) {
       throw new Error(`Cannot seek to ${byteOffset}`);
+    }
+
+    // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
+    // out if our seekTo puts us within the chunk and if so adjust the chunkCursor.
+    if (this.#chunk) {
+      // This is where the chunk starts in the file
+      const chunkStart = this.#fileCursor - this.#chunk.byteLength;
+      if (byteOffset >= chunkStart && byteOffset < this.#fileCursor) {
+        this.#chunkCursor = byteOffset - chunkStart;
+        return;
+      }
     }
 
     this.#fileCursor = byteOffset;
