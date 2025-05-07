@@ -59,6 +59,9 @@ export class ULog {
     return this.#header;
   }
 
+  /**
+   * Return a map of message ids to their corresponding subscription
+   */
   get subscriptions(): Map<number, Subscription> {
     return this.#subscriptions;
   }

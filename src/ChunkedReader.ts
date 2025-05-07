@@ -22,6 +22,13 @@ export class ChunkedReader {
     this.chunkSize = chunkSize;
   }
 
+  /**
+   * @deprecated You should open the FileLike yourself before using ChunkedReader
+   */
+  async open(): Promise<number> {
+    return await this.#file.open();
+  }
+
   view(): DataView | undefined {
     return this.#view;
   }
