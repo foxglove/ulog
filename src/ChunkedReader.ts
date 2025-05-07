@@ -2,6 +2,12 @@ import { Filelike } from "./file";
 
 const CHUNK_SIZE = 256 * 1024;
 
+/**
+ * ChunkedReader provides functions to read typed data from a FileLike.
+ *
+ * It amortizes the cost loading data from the FileLike by reading chunks (pages) of data into
+ * memory when reading typed data.
+ */
 export class ChunkedReader {
   readonly chunkSize: number;
 
