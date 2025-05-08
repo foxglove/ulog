@@ -3,9 +3,9 @@ import { Filelike } from "./file";
 const CHUNK_SIZE = 256 * 1024;
 
 /**
- * ChunkedReader provides functions to read typed data from a FileLike.
+ * ChunkedReader provides functions to read typed data from a Filelike.
  *
- * It amortizes the cost loading data from the FileLike by reading chunks (pages) of data into
+ * It amortizes the cost loading data from the Filelike by reading chunks (pages) of data into
  * memory when reading typed data.
  */
 export class ChunkedReader {
@@ -29,7 +29,7 @@ export class ChunkedReader {
   }
 
   /**
-   * @deprecated You should open the FileLike yourself before using ChunkedReader
+   * @deprecated You should open the Filelike yourself before using ChunkedReader
    */
   async open(): Promise<number> {
     return await this.#file.open();

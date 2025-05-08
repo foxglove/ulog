@@ -34,10 +34,27 @@ export type Subscription = MessageDefinition & Pick<MessageAddLogged, "multiId">
 
 const MAGIC = [0x55, 0x4c, 0x6f, 0x67, 0x01, 0x12, 0x35];
 
-type IndexEntry = [timestamp: bigint, offset: number, msgId: number | undefined];
+type MsgId = number & { __brand: "MsgId" };
+
+/**
+ * The synthetic message id for log messages.
+ *
+ * When entering a log message in an IndexEntry we tag it with this message id so we can identify
+ * log messages in the readMessage function if the `includeLogs` option is true.
+ */
+const LogMessageId = -1 as MsgId;
+
+/**
+ * An entry in the time index pointing to a message in the ulog file
+ *
+ * timestamp: the timestamp of the message
+ * offset: byte location in the file
+ * msgId: the message id if the message is a data message, LogMessageId if it is a log message, or undefined if it is not a data message
+ */
+type IndexEntry = [timestamp: bigint, offset: number, msgId: MsgId | undefined];
 
 export class ULog {
-  #fileLike: Filelike;
+  #filelike: Filelike;
   #chunkSize: number | undefined;
 
   // These members are only populated after open()
@@ -51,7 +68,7 @@ export class ULog {
   #dataTimeRange?: [bigint, bigint];
 
   constructor(filelike: Filelike, opts: { chunkSize?: number } = {}) {
-    this.#fileLike = filelike;
+    this.#filelike = filelike;
     this.#chunkSize = opts.chunkSize;
   }
 
@@ -67,8 +84,8 @@ export class ULog {
   }
 
   async open(): Promise<void> {
-    await this.#fileLike.open();
-    const reader = new ChunkedReader(this.#fileLike, this.#chunkSize);
+    await this.#filelike.open();
+    const reader = new ChunkedReader(this.#filelike, this.#chunkSize);
     const data = await reader.readBytes(8);
     for (let i = 0; i < MAGIC.length; i++) {
       if (data[i] !== MAGIC[i]) {
@@ -189,14 +206,16 @@ export class ULog {
     opts: {
       startTime?: bigint;
       endTime?: bigint;
+      /** If true (default) logs messages are yielded from the time range. */
       includeLogs?: boolean;
+      /** If specified, only messages with the given message ids are yielded. */
       msgIds?: Set<number>;
     } = {},
   ): AsyncIterableIterator<DataSectionMessage> {
-    const includeLogs = opts.includeLogs ?? false;
+    const includeLogs = opts.includeLogs ?? true;
     const msgIds = opts.msgIds;
 
-    const reader = new ChunkedReader(this.#fileLike, this.#chunkSize);
+    const reader = new ChunkedReader(this.#filelike, this.#chunkSize);
 
     const timeIndex = this.#timeIndex;
     if (timeIndex == undefined) {
@@ -216,26 +235,25 @@ export class ULog {
     }
 
     for (let i = range[0]; i <= range[1]; i++) {
-      const indexEntry = timeIndex[i]!;
+      const [_timestamp, offset, msgId] = timeIndex[i]!;
 
-      // if message is a log message and includeLogs is true, then yield it
-      if (includeLogs) {
-        reader.seekTo(indexEntry[1]);
+      if (includeLogs && msgId === LogMessageId) {
+        reader.seekTo(offset);
         const msg = await this.#readParsedMessage(reader);
         if (msg) {
           yield msg;
+          continue;
         }
       }
 
       // If there are message ids specified, then only yield if the locator msgId matches
       if (msgIds != undefined) {
-        const msgId = indexEntry[2];
         if (msgId == undefined || !msgIds.has(msgId)) {
           continue;
         }
       }
 
-      reader.seekTo(indexEntry[1]);
+      reader.seekTo(offset);
       const msg = await this.#readParsedMessage(reader);
       if (msg) {
         yield msg;
@@ -290,7 +308,7 @@ export class ULog {
           maxTimestamp = rawMessage.timestamp;
         }
 
-        timeIndex.push([rawMessage.timestamp, offset, undefined]);
+        timeIndex.push([rawMessage.timestamp, offset, LogMessageId]);
         logMessageCount++;
         continue;
       }
@@ -320,7 +338,7 @@ export class ULog {
           maxTimestamp = timestamp;
         }
 
-        timeIndex.push([timestamp, offset, dataMsg.msgId]);
+        timeIndex.push([timestamp, offset, dataMsg.msgId as MsgId]);
         dataCounts.set(dataMsg.msgId, (dataCounts.get(dataMsg.msgId) ?? 0) + 1);
         continue;
       }
@@ -342,10 +360,6 @@ export class ULog {
     const rawMessage = await readRawMessage(reader, this.#dataEnd);
     if (!rawMessage) {
       return undefined;
-    }
-
-    if (rawMessage.type === MessageType.AddLogged) {
-      this.#handleSubscription(rawMessage);
     }
 
     if (rawMessage.type !== MessageType.Data) {

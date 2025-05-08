@@ -61,8 +61,6 @@ export function parseTimestamp(
   view: DataView,
   offset = 0,
 ): bigint {
-  let timestamp: bigint | undefined;
-
   let curOffset = offset;
   for (const field of definition.fields) {
     if (field.name.startsWith("_")) {
@@ -75,17 +73,12 @@ export function parseTimestamp(
           `Message "${definition.name}" has a timestamp field with a non-integer value`,
         );
       }
-      timestamp = value;
-      break;
+      return value;
     }
     curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
   }
 
-  if (timestamp == undefined) {
-    throw new Error(`Message "${definition.name}" is missing a timestamp field`);
-  }
-
-  return timestamp;
+  throw new Error(`Message "${definition.name}" is missing a timestamp field`);
 }
 
 export function parseFieldValue(
