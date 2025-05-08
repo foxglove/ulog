@@ -16,7 +16,7 @@ import {
   FieldPrimitive,
   MessageDataParsed,
 } from "./messages";
-import { parseBasicFieldValue, parseMessage, parseTimestamp } from "./parse";
+import { fieldSize, parseBasicFieldValue, parseMessage } from "./parse";
 import { readRawMessage } from "./readMessage";
 
 export type ParameterEntry = { value: number; defaultTypes: number };
@@ -288,6 +288,10 @@ export class ULog {
     let maxTimestamp = 0n;
     let logMessageCount = 0;
 
+    // The offset of the timestamp field for a data message. The offset is from the start of the
+    // message data.
+    const timestampFieldOffsets = new Map<MsgId, number>();
+
     for (;;) {
       const offset = reader.position();
 
@@ -315,21 +319,29 @@ export class ULog {
 
       if (rawMessage.type === MessageType.Data) {
         const dataMsg = rawMessage;
-        const definition = this.#subscriptions.get(dataMsg.msgId);
-        if (!definition) {
-          const msgPos = reader.position() - rawMessage.size - 3;
-          throw new Error(
-            `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
-          );
+
+        let timestampOffset = timestampFieldOffsets.get(dataMsg.msgId as MsgId);
+        if (timestampOffset == undefined) {
+          // We don't yet have a timestamp offset for this message id so we compute it
+          const definition = this.#subscriptions.get(dataMsg.msgId);
+          if (!definition) {
+            const msgPos = reader.position() - rawMessage.size - 3;
+            throw new Error(
+              `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
+            );
+          }
+
+          timestampOffset = computeTimetampOffset(definition, this.#header.definitions);
+          timestampFieldOffsets.set(dataMsg.msgId as MsgId, timestampOffset);
         }
 
-        const data = dataMsg.data;
-        const timestamp = parseTimestamp(
-          definition,
-          this.#header.definitions,
-          reader.view()!,
-          data.byteOffset,
+        const view = new DataView(
+          dataMsg.data.buffer,
+          dataMsg.data.byteOffset,
+          dataMsg.data.byteLength,
         );
+        // we know the timestamp offset so we can parse the timestamp
+        const timestamp = view.getBigUint64(timestampOffset, true);
 
         if (minTimestamp == undefined || timestamp < minTimestamp) {
           minTimestamp = timestamp;
@@ -445,4 +457,28 @@ function sortTimeIndex(a: IndexEntry, b: IndexEntry) {
   }
 
   return Number(timestampA - timestampB);
+}
+
+export function computeTimetampOffset(
+  definition: MessageDefinition,
+  definitions: Map<string, MessageDefinition>,
+): number {
+  let curOffset = 0;
+  for (const field of definition.fields) {
+    if (field.name.startsWith("_")) {
+      continue;
+    }
+    if (field.name === "timestamp") {
+      if (field.type !== "uint64_t") {
+        throw new Error(
+          `Message "${definition.name}" has a timestamp field with a non-uint64_t type`,
+        );
+      }
+
+      return curOffset;
+    }
+    curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
+  }
+
+  throw new Error(`Message "${definition.name}" is missing a timestamp field`);
 }
