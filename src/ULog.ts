@@ -322,10 +322,7 @@ export class ULog {
         this.#handleSubscription(addLogged);
 
         timeIndex.push([maxTimestamp, offset, undefined]);
-        continue;
-      }
-
-      if (type === MessageType.Log) {
+      } else if (type === MessageType.Log) {
         const logMsg = await readMessageLog(reader, header);
 
         if (minTimestamp == undefined || logMsg.timestamp < minTimestamp) {
@@ -337,10 +334,7 @@ export class ULog {
 
         timeIndex.push([logMsg.timestamp, offset, LogMessageId]);
         logMessageCount++;
-        continue;
-      }
-
-      if (type === MessageType.LogTagged) {
+      } else if (type === MessageType.LogTagged) {
         const logMsg = await readMessageLogTagged(reader, header);
 
         if (minTimestamp == undefined || logMsg.timestamp < minTimestamp) {
@@ -352,10 +346,7 @@ export class ULog {
 
         timeIndex.push([logMsg.timestamp, offset, LogMessageId]);
         logMessageCount++;
-        continue;
-      }
-
-      if (type === MessageType.Data) {
+      } else if (type === MessageType.Data) {
         const dataMsg = await readMessageData(reader, header);
 
         let timestampOffset = timestampFieldOffsets.get(dataMsg.msgId as MsgId);
@@ -390,13 +381,12 @@ export class ULog {
 
         timeIndex.push([timestamp, offset, dataMsg.msgId as MsgId]);
         dataCounts.set(dataMsg.msgId, (dataCounts.get(dataMsg.msgId) ?? 0) + 1);
-        continue;
+      } else {
+        timeIndex.push([maxTimestamp, offset, undefined]);
+
+        // Skip past this message
+        reader.seek(header.size);
       }
-
-      timeIndex.push([maxTimestamp, offset, undefined]);
-
-      // Skip past this message
-      reader.seek(header.size);
     }
 
     this.#timeIndex = timeIndex.sort(sortTimeIndex);
