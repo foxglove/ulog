@@ -1,6 +1,6 @@
 {
   "name": "@foxglove/ulog",
-  "version": "2.1.5",
+  "version": "2.2.0",
   "description": "PX4 ULog file reader",
   "license": "MIT",
   "keywords": [
