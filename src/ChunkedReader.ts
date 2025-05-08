@@ -2,14 +2,25 @@ import { Filelike } from "./file";
 
 const CHUNK_SIZE = 256 * 1024;
 
+/**
+ * ChunkedReader provides functions to read typed data from a Filelike.
+ *
+ * It amortizes the cost loading data from the Filelike by reading chunks (pages) of data into
+ * memory when reading typed data.
+ */
 export class ChunkedReader {
   readonly chunkSize: number;
 
   #file: Filelike;
   #chunk?: Uint8Array;
   #view?: DataView;
+
+  /** Position in the file where we read the next chunk */
   #fileCursor = 0;
+
+  /** Position in the current chunk */
   #chunkCursor = 0;
+
   #textDecoder = new TextDecoder();
 
   constructor(filelike: Filelike, chunkSize = CHUNK_SIZE) {
@@ -17,6 +28,9 @@ export class ChunkedReader {
     this.chunkSize = chunkSize;
   }
 
+  /**
+   * @deprecated You should open the Filelike yourself before using ChunkedReader
+   */
   async open(): Promise<number> {
     return await this.#file.open();
   }
@@ -43,6 +57,17 @@ export class ChunkedReader {
       throw new Error(`Cannot seek to ${byteOffset}`);
     }
 
+    // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
+    // out if our seekTo puts us within the chunk and if so adjust the chunkCursor.
+    if (this.#chunk) {
+      // This is where the chunk starts in the file
+      const chunkStart = this.#fileCursor - this.#chunk.byteLength;
+      if (byteOffset >= chunkStart && byteOffset < this.#fileCursor) {
+        this.#chunkCursor = byteOffset - chunkStart;
+        return;
+      }
+    }
+
     this.#fileCursor = byteOffset;
     this.#chunkCursor = 0;
     this.#chunk = undefined;
@@ -52,6 +77,17 @@ export class ChunkedReader {
   seekTo(byteOffset: number): void {
     if (byteOffset < 0 || byteOffset > this.size()) {
       throw new Error(`Cannot seek to ${byteOffset}`);
+    }
+
+    // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
+    // out if our seekTo puts us within the chunk and if so adjust the chunkCursor.
+    if (this.#chunk) {
+      // This is where the chunk starts in the file
+      const chunkStart = this.#fileCursor - this.#chunk.byteLength;
+      if (byteOffset >= chunkStart && byteOffset < this.#fileCursor) {
+        this.#chunkCursor = byteOffset - chunkStart;
+        return;
+      }
     }
 
     this.#fileCursor = byteOffset;
