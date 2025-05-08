@@ -57,6 +57,17 @@ export class ChunkedReader {
       throw new Error(`Cannot seek to ${byteOffset}`);
     }
 
+    // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
+    // out if our seekTo puts us within the chunk and if so adjust the chunkCursor.
+    if (this.#chunk) {
+      // This is where the chunk starts in the file
+      const chunkStart = this.#fileCursor - this.#chunk.byteLength;
+      if (byteOffset >= chunkStart && byteOffset < this.#fileCursor) {
+        this.#chunkCursor = byteOffset - chunkStart;
+        return;
+      }
+    }
+
     this.#fileCursor = byteOffset;
     this.#chunkCursor = 0;
     this.#chunk = undefined;

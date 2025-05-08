@@ -17,7 +17,14 @@ import {
   MessageDataParsed,
 } from "./messages";
 import { fieldSize, parseBasicFieldValue, parseMessage } from "./parse";
-import { readRawMessage } from "./readMessage";
+import {
+  readMessageAddLogged,
+  readMessageData,
+  readMessageHeader,
+  readMessageLog,
+  readMessageLogTagged,
+  readRawMessage,
+} from "./readMessage";
 
 export type ParameterEntry = { value: number; defaultTypes: number };
 
@@ -278,10 +285,11 @@ export class ULog {
   }
 
   async #createIndex(reader: ChunkedReader): Promise<void> {
-    if (!this.#header) {
+    if (!this.#header || this.#dataEnd == undefined) {
       throw new Error(`Cannot read before open`);
     }
 
+    const dataEnd = this.#dataEnd;
     const timeIndex: IndexEntry[] = [];
     const dataCounts = new Map<number, number>();
     let minTimestamp: bigint | undefined;
@@ -295,39 +303,69 @@ export class ULog {
     for (;;) {
       const offset = reader.position();
 
-      const rawMessage = await readRawMessage(reader, this.#dataEnd);
-      if (!rawMessage) {
+      // If there is less than 3 bytes left in the file, we can't read a message header so we're done
+      if (dataEnd - offset < 3) {
         break;
       }
 
-      if (rawMessage.type === MessageType.AddLogged) {
-        this.#handleSubscription(rawMessage);
+      const header = await readMessageHeader(reader);
+      const type = header.type as MessageType;
+
+      // If there's not enough bytes in the file to read the message then we end indexing
+      if (reader.position() + header.size > dataEnd) {
+        break;
       }
 
-      if (rawMessage.type === MessageType.Log || rawMessage.type === MessageType.LogTagged) {
-        if (minTimestamp == undefined || rawMessage.timestamp < minTimestamp) {
-          minTimestamp = rawMessage.timestamp;
+      if (type === MessageType.AddLogged) {
+        // read the AddLogged message from the reader data
+        const addLogged = await readMessageAddLogged(reader, header);
+        this.#handleSubscription(addLogged);
+
+        timeIndex.push([maxTimestamp, offset, undefined]);
+        continue;
+      }
+
+      if (type === MessageType.Log) {
+        const logMsg = await readMessageLog(reader, header);
+
+        if (minTimestamp == undefined || logMsg.timestamp < minTimestamp) {
+          minTimestamp = logMsg.timestamp;
         }
-        if (rawMessage.timestamp > maxTimestamp) {
-          maxTimestamp = rawMessage.timestamp;
+        if (logMsg.timestamp > maxTimestamp) {
+          maxTimestamp = logMsg.timestamp;
         }
 
-        timeIndex.push([rawMessage.timestamp, offset, LogMessageId]);
+        timeIndex.push([logMsg.timestamp, offset, LogMessageId]);
         logMessageCount++;
         continue;
       }
 
-      if (rawMessage.type === MessageType.Data) {
-        const dataMsg = rawMessage;
+      if (type === MessageType.LogTagged) {
+        const logMsg = await readMessageLogTagged(reader, header);
+
+        if (minTimestamp == undefined || logMsg.timestamp < minTimestamp) {
+          minTimestamp = logMsg.timestamp;
+        }
+        if (logMsg.timestamp > maxTimestamp) {
+          maxTimestamp = logMsg.timestamp;
+        }
+
+        timeIndex.push([logMsg.timestamp, offset, LogMessageId]);
+        logMessageCount++;
+        continue;
+      }
+
+      if (type === MessageType.Data) {
+        const dataMsg = await readMessageData(reader, header);
 
         let timestampOffset = timestampFieldOffsets.get(dataMsg.msgId as MsgId);
         if (timestampOffset == undefined) {
           // We don't yet have a timestamp offset for this message id so we compute it
           const definition = this.#subscriptions.get(dataMsg.msgId);
           if (!definition) {
-            const msgPos = reader.position() - rawMessage.size - 3;
+            const msgPos = reader.position() - header.size - 3;
             throw new Error(
-              `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
+              `Unknown msg_id ${dataMsg.msgId} for ${header.size} byte 'D' message at offset ${msgPos}`,
             );
           }
 
@@ -356,6 +394,9 @@ export class ULog {
       }
 
       timeIndex.push([maxTimestamp, offset, undefined]);
+
+      // Skip past this message
+      reader.seek(header.size);
     }
 
     this.#timeIndex = timeIndex.sort(sortTimeIndex);
