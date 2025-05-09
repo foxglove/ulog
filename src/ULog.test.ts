@@ -86,6 +86,27 @@ describe("ULog sample.ulg", () => {
     void reader.close();
   });
 
+  it("readMessages() reverse", async () => {
+    const reader = new FileReader(sampleFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+
+    let prevTimestamp = BigInt(Number.MAX_SAFE_INTEGER);
+    for await (const msg of ulog.readMessages({ reverse: true })) {
+      if (msg.type === MessageType.Data) {
+        // eslint-disable-next-line jest/no-conditional-expect
+        expect(msg.value.timestamp).toBeLessThanOrEqual(prevTimestamp);
+        prevTimestamp = msg.value.timestamp;
+      } else if (msg.type === MessageType.Log || msg.type === MessageType.LogTagged) {
+        // eslint-disable-next-line jest/no-conditional-expect
+        expect(msg.timestamp).toBeLessThanOrEqual(prevTimestamp);
+        prevTimestamp = msg.timestamp;
+      }
+    }
+
+    void reader.close();
+  });
+
   it("MessageAddLogged", async () => {
     const reader = new FileReader(sampleFixture);
     const ulog = new ULog(reader);
