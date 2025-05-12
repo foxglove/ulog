@@ -217,6 +217,8 @@ export class ULog {
       includeLogs?: boolean;
       /** If specified, only messages with the given message ids are yielded. */
       msgIds?: Set<number>;
+      /** If true, the messages are yielded in reverse order (default false). */
+      reverse?: boolean;
     } = {},
   ): AsyncIterableIterator<DataSectionMessage> {
     const includeLogs = opts.includeLogs ?? true;
@@ -241,8 +243,19 @@ export class ULog {
       return;
     }
 
-    for (let i = range[0]; i <= range[1]; i++) {
-      const [_timestamp, offset, msgId] = timeIndex[i]!;
+    const startIndex = range[0];
+    const endIndex = range[1];
+
+    // The number of records between the start and end index. We will iterate this many times
+    // reading records. Which record we start from and the increment depends on the reverse flag.
+    const diffIndex = endIndex - startIndex;
+
+    // When reading in reverse we will start reading at endIndex and decrement towards startIndex
+    const increment = opts.reverse === true ? -1 : 1;
+    let idx = opts.reverse === true ? endIndex : startIndex;
+
+    for (let i = 0; i <= diffIndex; i++, idx += increment) {
+      const [_timestamp, offset, msgId] = timeIndex[idx]!;
 
       if (includeLogs && msgId === LogMessageId) {
         reader.seekTo(offset);
