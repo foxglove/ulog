@@ -243,57 +243,40 @@ export class ULog {
       return;
     }
 
-    if (opts.reverse === true) {
-      for (let i = range[1]; i >= range[0]; i--) {
-        const [_timestamp, offset, msgId] = timeIndex[i]!;
+    const startIndex = range[0];
+    const endIndex = range[1];
 
-        if (includeLogs && msgId === LogMessageId) {
-          reader.seekTo(offset);
-          const msg = await this.#readParsedMessage(reader);
-          if (msg) {
-            yield msg;
-            continue;
-          }
-        }
+    // The number of records between the start and end index. We will iterate this many times
+    // reading records. Which record we start from and the increment depends on the reverse flag.
+    const diffIndex = endIndex - startIndex;
 
-        // If there are message ids specified, then only yield if the locator msgId matches
-        if (msgIds != undefined) {
-          if (msgId == undefined || !msgIds.has(msgId)) {
-            continue;
-          }
-        }
+    // When reading in reverse we will start reading at endIndex and decrement towards startIndex
+    const increment = opts.reverse === true ? -1 : 1;
+    let idx = opts.reverse === true ? endIndex : startIndex;
 
+    for (let i = 0; i <= diffIndex; i++, idx += increment) {
+      const [_timestamp, offset, msgId] = timeIndex[idx]!;
+
+      if (includeLogs && msgId === LogMessageId) {
         reader.seekTo(offset);
         const msg = await this.#readParsedMessage(reader);
         if (msg) {
           yield msg;
+          continue;
         }
       }
-    } else {
-      for (let i = range[0]; i <= range[1]; i++) {
-        const [_timestamp, offset, msgId] = timeIndex[i]!;
 
-        if (includeLogs && msgId === LogMessageId) {
-          reader.seekTo(offset);
-          const msg = await this.#readParsedMessage(reader);
-          if (msg) {
-            yield msg;
-            continue;
-          }
+      // If there are message ids specified, then only yield if the locator msgId matches
+      if (msgIds != undefined) {
+        if (msgId == undefined || !msgIds.has(msgId)) {
+          continue;
         }
+      }
 
-        // If there are message ids specified, then only yield if the locator msgId matches
-        if (msgIds != undefined) {
-          if (msgId == undefined || !msgIds.has(msgId)) {
-            continue;
-          }
-        }
-
-        reader.seekTo(offset);
-        const msg = await this.#readParsedMessage(reader);
-        if (msg) {
-          yield msg;
-        }
+      reader.seekTo(offset);
+      const msg = await this.#readParsedMessage(reader);
+      if (msg) {
+        yield msg;
       }
     }
   }
