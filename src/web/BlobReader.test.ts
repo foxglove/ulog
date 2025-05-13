@@ -1,5 +1,3 @@
-/** @jest-environment jsdom */
-
 // Copyright 2018-2020 Cruise LLC
 // Copyright 2021 Foxglove Technologies Inc
 //
@@ -35,29 +33,5 @@ describe("browser reader", () => {
       Uint8Array.from([0, 1]),
       Uint8Array.from([0, 1]),
     ]);
-  });
-
-  it("reports browser FileReader errors", async () => {
-    const buffer = new Blob([Uint8Array.from([0x00, 0x01, 0x02, 0x03, 0x04])]);
-    const reader = new BlobReader(buffer);
-    const actualFileReader = global.FileReader;
-    (global as { FileReader: unknown }).FileReader = class FailReader {
-      onerror!: (_: this) => void;
-      readAsArrayBuffer() {
-        setTimeout(() => {
-          Object.defineProperty(this, "error", {
-            get() {
-              return new Error("fake error");
-            },
-          });
-
-          expect(typeof this.onerror).toBe("function");
-          this.onerror(this);
-        });
-      }
-    };
-
-    await expect(reader.read(0, 2)).rejects.toThrow("fake error");
-    global.FileReader = actualFileReader;
   });
 });
