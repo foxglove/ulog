@@ -2,10 +2,14 @@ import { Filelike } from "../file";
 
 // browser reader for Blob|File objects
 export class BlobReader implements Filelike {
-  public constructor(private file: Blob) {}
+  #blob: Blob;
+
+  public constructor(blob: Blob) {
+    this.#blob = blob;
+  }
 
   public size(): number {
-    return this.file.size;
+    return this.#blob.size;
   }
 
   async open(): Promise<number> {
@@ -16,13 +20,11 @@ export class BlobReader implements Filelike {
    * Read `length` bytes starting from `offset` bytes.
    */
   public async read(offset: number, length: number): Promise<Uint8Array> {
-    if (offset + length > this.file.size) {
+    if (offset + length > this.size()) {
       throw new Error(
-        `Read of ${length} bytes at offset ${offset} exceeds file size ${this.file.size}`,
+        `Read of ${length} bytes at offset ${offset} exceeds blob size ${this.size()}`,
       );
     }
-    return new Uint8Array(
-      await this.file.slice(Number(offset), Number(offset + length)).arrayBuffer(),
-    );
+    return new Uint8Array(await this.#blob.slice(offset, offset + length).arrayBuffer());
   }
 }
