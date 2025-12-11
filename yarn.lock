@@ -449,6 +449,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@foxglove/crc@npm:^0.0.3":
+  version: 0.0.3
+  resolution: "@foxglove/crc@npm:0.0.3"
+  checksum: 10c0/887ef5a6cc6bc29296ad3766a3d6c798b4cfb121b33565ba5c423d4584cfea90a2bfbe8508bb1f343a93ba7c848f8f63dfd78c7e9567c17407645bb2282b88da
+  languageName: node
+  linkType: hard
+
 "@foxglove/eslint-plugin@npm:2.0.0":
   version: 2.0.0
   resolution: "@foxglove/eslint-plugin@npm:2.0.0"
@@ -477,6 +484,8 @@ __metadata:
   resolution: "@foxglove/ulog@workspace:."
   dependencies:
     "@foxglove/eslint-plugin": "npm:2.0.0"
+    "@mcap/core": "npm:^2.1.7"
+    "@mcap/nodejs": "npm:^1.0.2"
     "@types/jest": "npm:29.5.14"
     eslint: "npm:9.26.0"
     eslint-config-prettier: "npm:8.10.0"
@@ -832,6 +841,26 @@ __metadata:
     "@jridgewell/resolve-uri": "npm:^3.1.0"
     "@jridgewell/sourcemap-codec": "npm:^1.4.14"
   checksum: 10c0/3d1ce6ebc69df9682a5a8896b414c6537e428a1d68b02fcc8363b04284a8ca0df04d0ee3013132252ab14f2527bc13bea6526a912ecb5658f0e39fd2860b4df4
+  languageName: node
+  linkType: hard
+
+"@mcap/core@npm:^2.1.7":
+  version: 2.1.7
+  resolution: "@mcap/core@npm:2.1.7"
+  dependencies:
+    "@foxglove/crc": "npm:^0.0.3"
+    heap-js: "npm:^2.2.0"
+    tslib: "npm:^2.5.0"
+  checksum: 10c0/61392bc3ae892422bdfda6d38973795ff107275a003feaa8728de6e76fb43ab4ea007480f6a689658043a5611f14a3955e53be880e8de8f2fbbdebf1e589c733
+  languageName: node
+  linkType: hard
+
+"@mcap/nodejs@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "@mcap/nodejs@npm:1.0.2"
+  dependencies:
+    tslib: "npm:^2.5.0"
+  checksum: 10c0/add51b689d9acaef7678a4e3802ce7d8481aa233e25d97643ecc4b4307c8504d7b2bb67216d8b5d41daad1ae1ab7d7c58b7d286371526ec4d6759383834f23b7
   languageName: node
   linkType: hard
 
@@ -3358,6 +3387,13 @@ __metadata:
   dependencies:
     function-bind: "npm:^1.1.2"
   checksum: 10c0/3769d434703b8ac66b209a4cca0737519925bbdb61dd887f93a16372b14694c63ff4e797686d87c90f08168e81082248b9b028bad60d4da9e0d1148766f56eb9
+  languageName: node
+  linkType: hard
+
+"heap-js@npm:^2.2.0":
+  version: 2.7.1
+  resolution: "heap-js@npm:2.7.1"
+  checksum: 10c0/a1e4ec7624487f198158599a04b73f5e72f3e805b2ee7dc18ae5340be035a8e5c9e6ee01d8ed4eb81a8bcb6c03b0342f57af386b2552825777a1d7c64adedbd4
   languageName: node
   linkType: hard
 
@@ -6375,7 +6411,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.8.1":
+"tslib@npm:^2.5.0, tslib@npm:^2.8.1":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
   checksum: 10c0/9c4759110a19c53f992d9aae23aac5ced636e99887b51b9e61def52611732872ff7668757d4e4c61f19691e36f4da981cd9485e869b4a7408d689f6bf1f14e62

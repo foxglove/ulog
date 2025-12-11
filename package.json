@@ -53,5 +53,9 @@
     "typescript": "5.8.3",
     "typescript-eslint": "8.32.0"
   },
-  "packageManager": "yarn@4.5.1"
+  "packageManager": "yarn@4.5.1",
+  "dependencies": {
+    "@mcap/core": "^2.1.7",
+    "@mcap/nodejs": "^1.0.2"
+  }
 }
