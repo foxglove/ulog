@@ -6,4 +6,4 @@ export * from "./file";
 export * from "./messages";
 export * from "./parse";
 export * from "./ULog";
-export { convertULogFileToMCAP } from "./convert";
+export * from "./convert";

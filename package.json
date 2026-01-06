@@ -56,6 +56,8 @@
   "packageManager": "yarn@4.5.1",
   "dependencies": {
     "@mcap/core": "^2.1.7",
-    "@mcap/nodejs": "^1.0.2"
+    "@mcap/nodejs": "^1.0.2",
+    "@mcap/support": "^1.0.4",
+    "protobufjs": "^8.0.0"
   }
 }
