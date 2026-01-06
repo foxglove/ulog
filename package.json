@@ -58,6 +58,6 @@
     "@mcap/core": "^2.1.7",
     "@mcap/nodejs": "^1.0.2",
     "@mcap/support": "^1.0.4",
-    "protobufjs": "^8.0.0"
+    "protobufjs": "^7.2.5"
   }
 }
