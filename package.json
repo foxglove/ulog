@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/foxglove/ulog.git"
+    "url": "git+https://github.com/foxglove/ulog.git"
   },
   "author": {
     "name": "Foxglove Technologies Inc",
