@@ -314,6 +314,42 @@ describe("truncated.ulg", () => {
   });
 });
 
+describe("flight.ulg", () => {
+  const flightFixture = path.join(__dirname, "..", "tests", "position_setpoint_triplet.ulg");
+
+  it("position_setpoint_triplet", async () => {
+    const reader = new FileReader(flightFixture);
+    const ulog = new ULog(reader);
+    await ulog.open();
+
+    let tripletMsgId: number | undefined;
+    for (const [msgId, sub] of ulog.subscriptions) {
+      if (sub.name === "position_setpoint_triplet") {
+        tripletMsgId = msgId;
+        break;
+      }
+    }
+    expect(tripletMsgId).toBeDefined();
+
+    let data: MessageDataParsed | undefined;
+    for await (const msg of ulog.readMessages({ msgIds: new Set([tripletMsgId!]) })) {
+      if (msg.type === MessageType.Data && msg.msgId === tripletMsgId) {
+        data = msg;
+        break;
+      }
+    }
+
+    expect(data).toBeDefined();
+    const current = data!.value.current as Record<string, unknown>;
+    expect(current.valid).toBe(true);
+    expect(current.lat).toBeCloseTo(24.949548440957212, 2);
+    expect(current.lon).toBeCloseTo(55.51369861839751, 2);
+    expect(current.alt).toBeCloseTo(150.0822296142578, 0);
+
+    await reader.close();
+  });
+});
+
 describe("README.md", () => {
   const sampleFixture = path.join(__dirname, "..", "tests", "sample.ulg");
 

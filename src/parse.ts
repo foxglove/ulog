@@ -43,10 +43,9 @@ export function parseMessage(
   const output: FieldStruct = {};
   let curOffset = offset;
   for (const field of definition.fields) {
-    if (field.name.startsWith("_")) {
-      continue;
+    if (!field.name.startsWith("_")) {
+      output[field.name] = parseFieldValue(field, definitions, view, curOffset);
     }
-    output[field.name] = parseFieldValue(field, definitions, view, curOffset);
     curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
   }
   if (typeof output.timestamp !== "bigint") {
@@ -108,7 +107,10 @@ export function messageSize(
   definition: MessageDefinition,
   definitions: Map<string, MessageDefinition>,
 ): number {
-  return definition.fields.reduce((size, f) => size + fieldSize(f, definitions), 0);
+  return definition.fields.reduce(
+    (size, f) => size + fieldSize(f, definitions) * (f.arrayLength ?? 1),
+    0,
+  );
 }
 
 export function fieldSize(field: Field, definitions: Map<string, MessageDefinition>): number {
