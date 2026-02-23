@@ -6,3 +6,4 @@ export * from "./file";
 export * from "./messages";
 export * from "./parse";
 export * from "./ULog";
+export * from "./ULogError";

@@ -1,3 +1,4 @@
+import { ULogError } from "./ULogError";
 import { Field, MessageDefinition } from "./definition";
 import { BuiltinType } from "./enums";
 import { FieldPrimitive, FieldStruct, FieldValue, ParsedMessage } from "./messages";
@@ -49,7 +50,7 @@ export function parseMessage(
     curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
   }
   if (typeof output.timestamp !== "bigint") {
-    throw new Error(`Message "${definition.name}" is missing a timestamp field`);
+    throw new ULogError(`Message "${definition.name}" is missing a timestamp field`);
   }
   return output as ParsedMessage;
 }
@@ -63,7 +64,7 @@ export function parseFieldValue(
   if (field.isComplex) {
     const definition = definitions.get(field.type);
     if (!definition) {
-      throw new Error(`Unknown type ${field.type}, searched ${definitions.size} definitions`);
+      throw new ULogError(`Unknown type ${field.type}, searched ${definitions.size} definitions`);
     }
     if (field.arrayLength != undefined) {
       const size = fieldSize(field, definitions);
@@ -121,7 +122,7 @@ export function fieldSize(field: Field, definitions: Map<string, MessageDefiniti
   if (field.isComplex) {
     const definition = definitions.get(field.type);
     if (!definition) {
-      throw new Error(`Unknown type ${field.type}, searched ${definitions.size} definitions`);
+      throw new ULogError(`Unknown type ${field.type}, searched ${definitions.size} definitions`);
     }
     field.size = messageSize(definition, definitions);
   } else {

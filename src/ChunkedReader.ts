@@ -1,3 +1,4 @@
+import { ULogError } from "./ULogError";
 import { Filelike } from "./file";
 
 const CHUNK_SIZE = 256 * 1024;
@@ -54,7 +55,7 @@ export class ChunkedReader {
   seek(relativeByteOffset: number): void {
     const byteOffset = this.position() + relativeByteOffset;
     if (byteOffset < 0 || byteOffset > this.size()) {
-      throw new Error(`Cannot seek to ${byteOffset}`);
+      throw new ULogError(`Cannot seek to ${byteOffset}`);
     }
 
     // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
@@ -76,7 +77,7 @@ export class ChunkedReader {
 
   seekTo(byteOffset: number): void {
     if (byteOffset < 0 || byteOffset > this.size()) {
-      throw new Error(`Cannot seek to ${byteOffset}`);
+      throw new ULogError(`Cannot seek to ${byteOffset}`);
     }
 
     // If we have a chunk it is more performant to attempt re-using the chunk. So we try to figure
@@ -99,7 +100,7 @@ export class ChunkedReader {
   async skip(count: number): Promise<void> {
     const byteOffset = this.#chunkCursor + count;
     if (count < 0 || byteOffset < 0 || byteOffset > this.size()) {
-      throw new Error(`Cannot skip ${count} bytes`);
+      throw new ULogError(`Cannot skip ${count} bytes`);
     }
 
     await this.#fetch(count);
@@ -193,7 +194,7 @@ export class ChunkedReader {
 
   async #fetch(bytesRequired: number): Promise<DataView> {
     if (bytesRequired > this.remaining()) {
-      throw new Error(
+      throw new ULogError(
         `Cannot read ${bytesRequired} bytes from ${this.size()} byte source, ${this.remaining()} bytes remaining`,
       );
     }
@@ -226,7 +227,9 @@ export class ChunkedReader {
       bytesAvailable = this.#chunk.byteLength - this.#chunkCursor;
 
       if (bytesAvailable < bytesRequired) {
-        throw new Error(`Requested ${bytesRequired} bytes but ${bytesAvailable} bytes available`);
+        throw new ULogError(
+          `Requested ${bytesRequired} bytes but ${bytesAvailable} bytes available`,
+        );
       }
     }
 

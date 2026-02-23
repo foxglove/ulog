@@ -1,4 +1,5 @@
 import { ChunkedReader } from "./ChunkedReader";
+import { ULogError } from "./ULogError";
 import {
   Field,
   MessageDefinition,
@@ -96,7 +97,7 @@ export class ULog {
     const data = await reader.readBytes(8);
     for (let i = 0; i < MAGIC.length; i++) {
       if (data[i] !== MAGIC[i]) {
-        throw new Error(`Invalid ULog header: ${toHex(data)}`);
+        throw new ULogError(`Invalid ULog header: ${toHex(data)}`);
       }
     }
 
@@ -152,7 +153,7 @@ export class ULog {
           if (msgdef) {
             definitions.set(msgdef.name, msgdef);
           } else {
-            throw new Error(`oops: ${formatMsg.format}`);
+            throw new ULogError(`oops: ${formatMsg.format}`);
           }
           break;
         }
@@ -189,7 +190,7 @@ export class ULog {
         case MessageType.Synchronization:
         case MessageType.Dropout:
         default:
-          throw new Error(`Unrecognized message type ${message.type}`);
+          throw new ULogError(`Unrecognized message type ${message.type}`);
       }
     }
 
@@ -368,7 +369,7 @@ export class ULog {
           const definition = this.#subscriptions.get(dataMsg.msgId);
           if (!definition) {
             const msgPos = reader.position() - header.size - 3;
-            throw new Error(
+            throw new ULogError(
               `Unknown msg_id ${dataMsg.msgId} for ${header.size} byte 'D' message at offset ${msgPos}`,
             );
           }
@@ -426,7 +427,7 @@ export class ULog {
     const definition = this.#subscriptions.get(dataMsg.msgId);
     if (!definition) {
       const msgPos = reader.position() - rawMessage.size - 3;
-      throw new Error(
+      throw new ULogError(
         `Unknown msg_id ${dataMsg.msgId} for ${rawMessage.size} byte 'D' message at offset ${msgPos}`,
       );
     }
@@ -451,7 +452,7 @@ export class ULog {
   #handleSubscription(subscribe: MessageAddLogged): void {
     const definition = this.#header?.definitions.get(subscribe.messageName);
     if (!definition) {
-      throw new Error(`AddLogged unknown message_name: ${subscribe.messageName}`);
+      throw new ULogError(`AddLogged unknown message_name: ${subscribe.messageName}`);
     }
     this.#subscriptions.set(subscribe.msgId, { ...definition, multiId: subscribe.multiId });
   }
@@ -514,7 +515,7 @@ export function computeTimetampOffset(
     }
     if (field.name === "timestamp") {
       if (field.type !== "uint64_t") {
-        throw new Error(
+        throw new ULogError(
           `Message "${definition.name}" has a timestamp field with a non-uint64_t type`,
         );
       }
@@ -524,5 +525,5 @@ export function computeTimetampOffset(
     curOffset += fieldSize(field, definitions) * (field.arrayLength ?? 1);
   }
 
-  throw new Error(`Message "${definition.name}" is missing a timestamp field`);
+  throw new ULogError(`Message "${definition.name}" is missing a timestamp field`);
 }
